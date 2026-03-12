@@ -1,0 +1,77 @@
+@import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans&display=swap");
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 78 29% 93%;
+    --foreground: 189 40% 12%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 189 40% 12%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 189 40% 12%;
+
+    --primary: 189 83% 27%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 189 20% 90%;
+    --secondary-foreground: 189 60% 18%;
+
+    --muted: 78 15% 88%;
+    --muted-foreground: 189 10% 45%;
+
+    --accent: 20 93% 49%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 189 15% 85%;
+    --input: 189 15% 85%;
+    --ring: 189 83% 27%;
+
+    --radius: 0.75rem;
+
+    --mustard: 39 93% 47%;
+    --mustard-foreground: 0 0% 100%;
+
+    --success: 152 60% 40%;
+    --success-foreground: 0 0% 100%;
+
+    --warning: 39 93% 47%;
+    --warning-foreground: 39 80% 15%;
+
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 189 40% 12%;
+    --sidebar-primary: 189 83% 27%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 189 20% 94%;
+    --sidebar-accent-foreground: 189 60% 18%;
+    --sidebar-border: 189 15% 90%;
+    --sidebar-ring: 189 83% 27%;
+  }
+  .dark {
+    --radius: 0.75rem;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+  }
+}
+
+@layer utilities {
+  .stat-card {
+    @apply bg-card rounded-xl border shadow-sm p-5 transition-shadow hover:shadow-md;
+  }
+  .page-container {
+    @apply space-y-6;
+  }
+}
