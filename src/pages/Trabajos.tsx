@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
-import { Plus, Search, Pencil, Trash2, Eye, Upload, X } from 'lucide-react';
+import { Plus, Search, Pencil, Trash2, Eye, Upload, X, ChevronLeft, ChevronRight, Calendar } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
   AlertDialog,
@@ -24,6 +25,21 @@ import { fetchAll, insertRow, updateRow, deleteRow } from '@/lib/supabase-servic
 import { formatCurrency } from '@/utils/helpers';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
+
+// ── Calendario ──────────────────────────────────────────────
+const db = supabase as any;
+const DIAS  = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+const tiposEvento = ['Reunión','Llamada','Entrega','Compra','Pago','Otro'];
+const colorEstado: Record<string, string> = {
+  'Pendiente': '#888780', 'En proceso': '#185FA5', 'Finalizado': '#1D9E75',
+  'Entregado': '#3B6D11', 'Cancelado': '#A32D2D',
+};
+const colorEvento: Record<string, string> = {
+  'Reunión':'#534AB7','Llamada':'#1D9E75','Entrega':'#BA7517',
+  'Compra':'#0F6E56','Pago':'#A32D2D','Otro':'#5F5E5A',
+};
+const emptyEvento = { titulo: '', tipo: 'Reunión', fecha: '', hora: '', descripcion: '' };
 
 const categorias = ['Tapicería', 'Ebanistería', 'Mixto'];
 const estados = ['Pendiente', 'En proceso', 'Finalizado', 'Entregado', 'Cancelado'];
@@ -100,6 +116,16 @@ export default function Trabajos() {
   const [originalEstado, setOriginalEstado] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
+  // ── Calendario state ──
+  const hoy = new Date();
+  const [calAnio, setCalAnio] = useState(hoy.getFullYear());
+  const [calMes, setCalMes]   = useState(hoy.getMonth());
+  const [eventos, setEventos] = useState<any[]>([]);
+  const [diaVer, setDiaVer]   = useState<string | null>(null);
+  const [evForm, setEvForm]   = useState<any>(emptyEvento);
+  const [evDialog, setEvDialog] = useState(false);
+  const [evDeleteId, setEvDeleteId] = useState<string | null>(null);
+
   const { toast } = useToast();
 
   const reload = async () => {
@@ -107,11 +133,43 @@ export default function Trabajos() {
     setItems(t);
     setClientes(c);
   };
+
+  const reloadEventos = async () => {
+    const { data } = await db.from('eventos_calendario').select('*').order('fecha');
+    setEventos(data || []);
+  };
+
   useEffect(() => {
     reload();
+    reloadEventos();
   }, []);
 
   const clienteNombre = (id: string) => clientes.find((c: any) => c.id === id)?.nombre_completo || '—';
+
+  // ── Helpers calendario ──
+  const hoyStr = `${hoy.getFullYear()}-${String(hoy.getMonth()+1).padStart(2,'0')}-${String(hoy.getDate()).padStart(2,'0')}`;
+  const toDateStr = (d: number) => `${calAnio}-${String(calMes+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+  const diasEnMes = new Date(calAnio, calMes+1, 0).getDate();
+  const primerDia = new Date(calAnio, calMes, 1).getDay();
+  const prevMes = () => { if (calMes===0){setCalMes(11);setCalAnio(a=>a-1);}else setCalMes(m=>m-1); };
+  const nextMes = () => { if (calMes===11){setCalMes(0);setCalAnio(a=>a+1);}else setCalMes(m=>m+1); };
+
+  const trabajosDelDia = (fecha: string) =>
+    items.filter(t => t.fecha_entrega_estimada === fecha && !['Entregado','Cancelado'].includes(t.estado));
+  const eventosDelDia  = (fecha: string) => eventos.filter(e => e.fecha === fecha);
+
+  const saveEvento = async () => {
+    if (!evForm.titulo || !evForm.fecha) { toast({ title: 'Título y fecha requeridos', variant: 'destructive' }); return; }
+    if (evForm.id) await db.from('eventos_calendario').update(evForm).eq('id', evForm.id);
+    else await db.from('eventos_calendario').insert(evForm);
+    reloadEventos(); setEvDialog(false); setEvForm(emptyEvento);
+    toast({ title: '✅ Evento guardado' });
+  };
+  const deleteEvento = async () => {
+    if (!evDeleteId) return;
+    await db.from('eventos_calendario').delete().eq('id', evDeleteId);
+    reloadEventos(); setEvDeleteId(null);
+  };
 
   const filtered = items.filter((i: any) => {
     const ms =
@@ -287,85 +345,194 @@ export default function Trabajos() {
         )}
       </div>
 
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input placeholder="Buscar..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
-        </div>
-        <Select value={estadoFilter} onValueChange={setEstadoFilter}>
-          <SelectTrigger className="w-full sm:w-[180px]">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="todos">Todos</SelectItem>
-            {estados.map((e) => (
-              <SelectItem key={e} value={e}>
-                {e}
-              </SelectItem>
+      <Tabs defaultValue="lista">
+        <TabsList className="mb-2">
+          <TabsTrigger value="lista">📋 Lista</TabsTrigger>
+          <TabsTrigger value="calendario">📅 Calendario</TabsTrigger>
+        </TabsList>
+
+        {/* ══ PESTAÑA LISTA ══ */}
+        <TabsContent value="lista" className="space-y-4">
+          <div className="flex flex-col sm:flex-row gap-3">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input placeholder="Buscar..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
+            </div>
+            <Select value={estadoFilter} onValueChange={setEstadoFilter}>
+              <SelectTrigger className="w-full sm:w-[180px]"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos</SelectItem>
+                {estados.map((e) => <SelectItem key={e} value={e}>{e}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="border rounded-lg overflow-x-auto bg-card">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Descripción</TableHead>
+                  <TableHead className="hidden sm:table-cell">Cliente</TableHead>
+                  <TableHead>Estado</TableHead>
+                  <TableHead className="hidden md:table-cell">Categoría</TableHead>
+                  <TableHead className="hidden lg:table-cell text-right">Monto total</TableHead>
+                  <TableHead className="w-[120px]">Acciones</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filtered.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center text-muted-foreground py-8">Sin trabajos</TableCell>
+                  </TableRow>
+                )}
+                {filtered.map((t: any) => (
+                  <TableRow key={t.id}>
+                    <TableCell>
+                      <span className="font-medium">{t.descripcion_trabajo}</span>
+                      <span className="block sm:hidden text-xs text-muted-foreground">{clienteNombre(t.id_cliente)}</span>
+                    </TableCell>
+                    <TableCell className="hidden sm:table-cell text-muted-foreground">{clienteNombre(t.id_cliente)}</TableCell>
+                    <TableCell><Badge variant={estadoBadge[t.estado]}>{t.estado}</Badge></TableCell>
+                    <TableCell className="hidden md:table-cell text-muted-foreground">{t.categoria}</TableCell>
+                    <TableCell className="hidden lg:table-cell text-right">{formatCurrency(t.monto_final ?? 0)}</TableCell>
+                    <TableCell>
+                      <div className="flex gap-1">
+                        <Link to={`/trabajos/${t.id}`}>
+                          <Button variant="ghost" size="icon"><Eye className="h-4 w-4" /></Button>
+                        </Link>
+                        {isOwner && (
+                          <>
+                            <Button variant="ghost" size="icon" onClick={() => openEdit(t)}><Pencil className="h-4 w-4" /></Button>
+                            <Button variant="ghost" size="icon" onClick={() => setDeleteId(t.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                          </>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </TabsContent>
+
+        {/* ══ PESTAÑA CALENDARIO ══ */}
+        <TabsContent value="calendario" className="space-y-4">
+          {/* Cabecera mes */}
+          <div className="flex items-center justify-between">
+            <Button variant="ghost" size="icon" onClick={prevMes}><ChevronLeft className="h-5 w-5" /></Button>
+            <h2 className="text-base font-semibold">{MESES[calMes]} {calAnio}</h2>
+            <Button variant="ghost" size="icon" onClick={nextMes}><ChevronRight className="h-5 w-5" /></Button>
+          </div>
+
+          {/* Leyenda */}
+          <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
+            {Object.entries(colorEstado).map(([estado, color]) => (
+              <span key={estado} className="flex items-center gap-1">
+                <span className="w-2.5 h-2.5 rounded-full inline-block" style={{ backgroundColor: color }} />
+                {estado}
+              </span>
             ))}
-          </SelectContent>
-        </Select>
-      </div>
+            <span className="flex items-center gap-1 ml-2 font-medium text-foreground/70">
+              <span className="w-2.5 h-2.5 rounded-full inline-block bg-purple-500" />Eventos
+            </span>
+          </div>
 
-      <div className="border rounded-lg overflow-x-auto bg-card">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Descripción</TableHead>
-              <TableHead className="hidden sm:table-cell">Cliente</TableHead>
-              <TableHead>Estado</TableHead>
-              <TableHead className="hidden md:table-cell">Categoría</TableHead>
-              <TableHead className="hidden lg:table-cell text-right">Monto total</TableHead>
-              <TableHead className="w-[120px]">Acciones</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filtered.length === 0 && (
-              <TableRow>
-                <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
-                  Sin trabajos
-                </TableCell>
-              </TableRow>
-            )}
-
-            {filtered.map((t: any) => (
-              <TableRow key={t.id}>
-                <TableCell>
-                  <span className="font-medium">{t.descripcion_trabajo}</span>
-                  <span className="block sm:hidden text-xs text-muted-foreground">{clienteNombre(t.id_cliente)}</span>
-                </TableCell>
-                <TableCell className="hidden sm:table-cell text-muted-foreground">{clienteNombre(t.id_cliente)}</TableCell>
-                <TableCell>
-                  <Badge variant={estadoBadge[t.estado]}>{t.estado}</Badge>
-                </TableCell>
-                <TableCell className="hidden md:table-cell text-muted-foreground">{t.categoria}</TableCell>
-                <TableCell className="hidden lg:table-cell text-right">
-                  {formatCurrency(t.monto_final ?? 0)}
-                </TableCell>
-                <TableCell>
-                  <div className="flex gap-1">
-                    <Link to={`/trabajos/${t.id}`}>
-                      <Button variant="ghost" size="icon">
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                    </Link>
-                    {isOwner && (
-                      <>
-                        <Button variant="ghost" size="icon" onClick={() => openEdit(t)}>
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" onClick={() => setDeleteId(t.id)}>
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                      </>
-                    )}
+          {/* Grilla */}
+          <div className="border rounded-xl overflow-hidden bg-card">
+            <div className="grid grid-cols-7 border-b bg-secondary/30">
+              {DIAS.map(d => (
+                <div key={d} className="text-center text-xs font-medium text-muted-foreground py-2">{d}</div>
+              ))}
+            </div>
+            <div className="grid grid-cols-7">
+              {Array.from({ length: primerDia }).map((_, i) => (
+                <div key={`e-${i}`} className="min-h-[80px] border-b border-r bg-secondary/10" />
+              ))}
+              {Array.from({ length: diasEnMes }).map((_, i) => {
+                const dia = i + 1;
+                const fecha = toDateStr(dia);
+                const esHoy = fecha === hoyStr;
+                const tsDia = trabajosDelDia(fecha);
+                const evsDia = eventosDelDia(fecha);
+                const total = tsDia.length + evsDia.length;
+                return (
+                  <div
+                    key={dia}
+                    onClick={() => setDiaVer(fecha)}
+                    className={`min-h-[80px] border-b border-r p-1 cursor-pointer hover:bg-secondary/40 transition-colors ${esHoy ? 'bg-primary/5' : ''}`}
+                  >
+                    <div className={`text-xs font-semibold w-5 h-5 flex items-center justify-center rounded-full mb-1 ${esHoy ? 'bg-primary text-primary-foreground' : ''}`}>
+                      {dia}
+                    </div>
+                    <div className="space-y-0.5">
+                      {tsDia.slice(0,2).map((t: any) => (
+                        <div key={t.id} className="text-[10px] px-1 py-0.5 rounded truncate text-white font-medium leading-tight"
+                          style={{ backgroundColor: colorEstado[t.estado] || '#888' }}
+                          title={`${t.descripcion_trabajo} · ${clienteNombre(t.id_cliente)}`}>
+                          {t.descripcion_trabajo}
+                        </div>
+                      ))}
+                      {evsDia.slice(0, 2 - Math.min(tsDia.length, 2)).map((e: any) => (
+                        <div key={e.id} className="text-[10px] px-1 py-0.5 rounded truncate text-white font-medium leading-tight"
+                          style={{ backgroundColor: colorEvento[e.tipo] || '#5F5E5A' }}
+                          title={e.titulo}>
+                          {e.titulo}
+                        </div>
+                      ))}
+                      {total > 2 && <div className="text-[10px] text-muted-foreground pl-1">+{total - 2} más</div>}
+                    </div>
                   </div>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Lista del mes */}
+          {(() => {
+            const mesStr = `${calAnio}-${String(calMes+1).padStart(2,'0')}`;
+            const tsMes = items.filter(t => t.fecha_entrega_estimada?.startsWith(mesStr) && !['Entregado','Cancelado'].includes(t.estado));
+            const evsMes = eventos.filter(e => e.fecha?.startsWith(mesStr));
+            const todo = [
+              ...tsMes.map(t => ({ tipo: 'trabajo', fecha: t.fecha_entrega_estimada, titulo: t.descripcion_trabajo, sub: clienteNombre(t.id_cliente), estado: t.estado, id: t.id })),
+              ...evsMes.map(e => ({ tipo: 'evento', fecha: e.fecha, titulo: e.titulo, sub: e.hora || '', tipoEvento: e.tipo, id: e.id })),
+            ].sort((a,b) => a.fecha.localeCompare(b.fecha));
+            if (!todo.length) return null;
+            return (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-semibold text-muted-foreground">Pendientes de {MESES[calMes]}</h3>
+                  {isOwner && (
+                    <Button size="sm" variant="outline" className="gap-1 text-xs"
+                      onClick={() => { setEvForm({ ...emptyEvento, fecha: hoyStr }); setEvDialog(true); }}>
+                      <Plus className="h-3.5 w-3.5" />Evento
+                    </Button>
+                  )}
+                </div>
+                {todo.map((item, idx) => (
+                  <div key={idx} className="flex items-center gap-3 p-3 rounded-lg bg-card border hover:bg-secondary/30 transition-colors cursor-pointer"
+                    onClick={() => item.tipo === 'trabajo' ? window.location.href = `/trabajos/${item.id}` : setDiaVer(item.fecha)}>
+                    <div className="w-1.5 h-8 rounded-full shrink-0"
+                      style={{ backgroundColor: item.tipo === 'trabajo' ? colorEstado[item.estado!] : colorEvento[item.tipoEvento!] || '#5F5E5A' }} />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{item.titulo}</p>
+                      <p className="text-xs text-muted-foreground">{item.fecha}{item.sub ? ` · ${item.sub}` : ''}</p>
+                    </div>
+                    <Badge variant="outline" className="text-[10px] shrink-0">
+                      {item.tipo === 'trabajo' ? item.estado : item.tipoEvento}
+                    </Badge>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
+
+          {isOwner && (
+            <Button variant="outline" className="w-full gap-2" onClick={() => { setEvForm({ ...emptyEvento, fecha: hoyStr }); setEvDialog(true); }}>
+              <Plus className="h-4 w-4" />Agregar evento al calendario
+            </Button>
+          )}
+        </TabsContent>
+      </Tabs>
 
       {/* FORM DIALOG */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
@@ -618,12 +785,7 @@ export default function Trabajos() {
       </Dialog>
 
       {/* DELETE DIALOG */}
-      <AlertDialog
-        open={!!deleteId}
-        onOpenChange={(open) => {
-          if (!open) setDeleteId(null);
-        }}
-      >
+      <AlertDialog open={!!deleteId} onOpenChange={(open) => { if (!open) setDeleteId(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>¿Eliminar trabajo?</AlertDialogTitle>
@@ -633,6 +795,99 @@ export default function Trabajos() {
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction onClick={handleDelete}>Eliminar</AlertDialogAction>
           </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* ── DIALOGS CALENDARIO ── */}
+      {/* Ver día */}
+      <Dialog open={!!diaVer} onOpenChange={() => setDiaVer(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Calendar className="h-4 w-4" />
+              {diaVer && new Date(diaVer + 'T12:00:00').toLocaleDateString('es-DO', { weekday:'long', day:'numeric', month:'long' })}
+            </DialogTitle>
+          </DialogHeader>
+          {diaVer && (() => {
+            const tsDia  = trabajosDelDia(diaVer);
+            const evsDia = eventosDelDia(diaVer);
+            const total  = tsDia.length + evsDia.length;
+            return (
+              <div className="space-y-3">
+                {total === 0 && <p className="text-sm text-muted-foreground text-center py-4">Sin eventos este día.</p>}
+                {tsDia.map((t: any) => (
+                  <div key={t.id} className="flex items-start gap-3 p-3 rounded-lg bg-secondary/40">
+                    <div className="w-2 h-2 rounded-full mt-1.5 shrink-0" style={{ backgroundColor: colorEstado[t.estado] }} />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold">{t.descripcion_trabajo}</p>
+                      <p className="text-xs text-muted-foreground">{clienteNombre(t.id_cliente)}</p>
+                      <Badge variant="outline" className="text-[10px] mt-1">{t.estado}</Badge>
+                    </div>
+                    <Link to={`/trabajos/${t.id}`} onClick={() => setDiaVer(null)}>
+                      <Button variant="ghost" size="sm" className="text-xs h-7">Ver</Button>
+                    </Link>
+                  </div>
+                ))}
+                {evsDia.map((e: any) => (
+                  <div key={e.id} className="flex items-start gap-3 p-3 rounded-lg bg-secondary/40">
+                    <div className="w-2 h-2 rounded-full mt-1.5 shrink-0" style={{ backgroundColor: colorEvento[e.tipo] || '#5F5E5A' }} />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold">{e.titulo}</p>
+                      {e.hora && <p className="text-xs text-muted-foreground">{e.hora}</p>}
+                      {e.descripcion && <p className="text-xs text-muted-foreground mt-1">{e.descripcion}</p>}
+                      <Badge variant="outline" className="text-[10px] mt-1">{e.tipo}</Badge>
+                    </div>
+                    {isOwner && (
+                      <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0"
+                        onClick={() => { setEvDeleteId(e.id); setDiaVer(null); }}>
+                        <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                      </Button>
+                    )}
+                  </div>
+                ))}
+                {isOwner && (
+                  <Button variant="outline" className="w-full gap-2 mt-1"
+                    onClick={() => { setEvForm({ ...emptyEvento, fecha: diaVer }); setDiaVer(null); setEvDialog(true); }}>
+                    <Plus className="h-4 w-4" />Agregar evento este día
+                  </Button>
+                )}
+              </div>
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
+
+      {/* Crear evento */}
+      <Dialog open={evDialog} onOpenChange={setEvDialog}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader><DialogTitle>{evForm.id ? 'Editar' : 'Nuevo'} Evento</DialogTitle></DialogHeader>
+          <div className="grid gap-4 py-2">
+            <div className="grid gap-1.5"><Label className="text-xs">Título *</Label><Input value={evForm.titulo} onChange={e => setEvForm({ ...evForm, titulo: e.target.value })} /></div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="grid gap-1.5">
+                <Label className="text-xs">Tipo</Label>
+                <Select value={evForm.tipo} onValueChange={v => setEvForm({ ...evForm, tipo: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>{tiposEvento.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-1.5"><Label className="text-xs">Hora</Label><Input type="time" value={evForm.hora || ''} onChange={e => setEvForm({ ...evForm, hora: e.target.value })} /></div>
+            </div>
+            <div className="grid gap-1.5"><Label className="text-xs">Fecha *</Label><Input type="date" value={evForm.fecha} onChange={e => setEvForm({ ...evForm, fecha: e.target.value })} /></div>
+            <div className="grid gap-1.5"><Label className="text-xs">Descripción</Label><Textarea value={evForm.descripcion || ''} onChange={e => setEvForm({ ...evForm, descripcion: e.target.value })} rows={2} /></div>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setEvDialog(false)}>Cancelar</Button>
+            <Button onClick={saveEvento}>Guardar</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Eliminar evento */}
+      <AlertDialog open={!!evDeleteId} onOpenChange={() => setEvDeleteId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader><AlertDialogTitle>¿Eliminar evento?</AlertDialogTitle><AlertDialogDescription>Esta acción no se puede deshacer.</AlertDialogDescription></AlertDialogHeader>
+          <AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={deleteEvento}>Eliminar</AlertDialogAction></AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
     </div>

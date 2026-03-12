@@ -5,6 +5,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -12,31 +13,44 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { Plus, Trash2, Settings, Shield, CreditCard, Building2, Pencil } from 'lucide-react';
+import { Plus, Trash2, Settings, Shield, CreditCard, Building2, Pencil, ChevronDown, ChevronUp } from 'lucide-react';
+import { MODULOS } from '@/hooks/usePermisos';
 
 const db = supabase as any;
 
 export default function Configuracion() {
   const { toast } = useToast();
-  const [config, setConfig] = useState<Record<string, string>>({});
-  const [saving, setSaving] = useState(false);
-  const [users, setUsers] = useState<any[]>([]);
+  const [config, setConfig]   = useState<Record<string, string>>({});
+  const [saving, setSaving]   = useState(false);
+  const [users, setUsers]     = useState<any[]>([]);
   const [roleDialog, setRoleDialog] = useState(false);
-  const [newEmail, setNewEmail] = useState('');
-  const [newPass, setNewPass] = useState('');
-  const [newNombre, setNewNombre] = useState('');
-  const [newRole, setNewRole] = useState<string>('employee');
+  const [newEmail, setNewEmail]     = useState('');
+  const [newPass, setNewPass]       = useState('');
+  const [newNombre, setNewNombre]   = useState('');
+  const [newRole, setNewRole]       = useState<string>('employee');
   const [deleteUserId, setDeleteUserId] = useState<string | null>(null);
 
+  // Permisos por usuario
+  const [permisosDialog, setPermisosDialog]   = useState(false);
+  const [permisosUsuario, setPermisosUsuario] = useState<any>(null);
+  const [permisosActivos, setPermisosActivos] = useState<Set<string>>(new Set());
+  const [savingPermisos, setSavingPermisos]   = useState(false);
+
+  // Permisos al crear nuevo usuario
+  const [newPermisos, setNewPermisos] = useState<Set<string>>(
+    new Set(MODULOS.map(m => m.key)) // todos activos por defecto
+  );
+  const [showNewPermisos, setShowNewPermisos] = useState(false);
+
   // Cuentas y tarjetas
-  const [cuentas, setCuentas] = useState<any[]>([]);
-  const [tarjetas, setTarjetas] = useState<any[]>([]);
+  const [cuentas, setCuentas]           = useState<any[]>([]);
+  const [tarjetas, setTarjetas]         = useState<any[]>([]);
   const [cuentaDialog, setCuentaDialog] = useState(false);
   const [tarjetaDialog, setTarjetaDialog] = useState(false);
-  const [editCuenta, setEditCuenta] = useState<any>(null);
-  const [editTarjeta, setEditTarjeta] = useState<any>(null);
-  const [formCuenta, setFormCuenta] = useState({ banco: '', ultimos4: '', tipo: 'Corriente' });
-  const [formTarjeta, setFormTarjeta] = useState({ nombre: '', ultimos4: '', banco: '' });
+  const [editCuenta, setEditCuenta]     = useState<any>(null);
+  const [editTarjeta, setEditTarjeta]   = useState<any>(null);
+  const [formCuenta, setFormCuenta]     = useState({ banco: '', ultimos4: '', tipo: 'Corriente' });
+  const [formTarjeta, setFormTarjeta]   = useState({ nombre: '', ultimos4: '', banco: '' });
 
   const loadConfig = async () => {
     const { data } = await db.from('configuracion').select('clave, valor');
@@ -44,25 +58,26 @@ export default function Configuracion() {
       const map: Record<string, string> = {};
       data.forEach((d: any) => { map[d.clave] = d.valor; });
       setConfig(map);
-      // Cargar cuentas y tarjetas desde config
       try { setCuentas(JSON.parse(map.cuentas_banco || '[]')); } catch { setCuentas([]); }
       try { setTarjetas(JSON.parse(map.tarjetas || '[]')); } catch { setTarjetas([]); }
     }
   };
 
   const loadUsers = async () => {
-    const { data: roles } = await db.from('user_roles').select('*');
+    const { data: roles }    = await db.from('user_roles').select('*');
     const { data: profiles } = await db.from('profiles').select('*');
     if (roles && profiles) {
       const merged = profiles.map((p: any) => ({
         ...p,
-        role: roles.find((r: any) => r.user_id === p.user_id)?.role || 'sin rol'
+        role: roles.find((r: any) => r.user_id === p.user_id)?.role || 'sin rol',
       }));
       setUsers(merged);
     }
   };
 
   useEffect(() => { loadConfig(); loadUsers(); }, []);
+
+  const updateVal = (key: string, val: string) => setConfig(prev => ({ ...prev, [key]: val }));
 
   const saveConfig = async () => {
     setSaving(true);
@@ -93,8 +108,7 @@ export default function Configuracion() {
       nuevas = [...cuentas, { ...formCuenta, nombre, id: Date.now().toString() }];
     }
     await saveCuentas(nuevas);
-    setCuentaDialog(false);
-    setEditCuenta(null);
+    setCuentaDialog(false); setEditCuenta(null);
     setFormCuenta({ banco: '', ultimos4: '', tipo: 'Corriente' });
     toast({ title: editCuenta !== null ? '✅ Cuenta actualizada' : '✅ Cuenta añadida' });
   };
@@ -109,46 +123,95 @@ export default function Configuracion() {
       nuevas = [...tarjetas, { ...formTarjeta, nombre, id: Date.now().toString() }];
     }
     await saveTarjetas(nuevas);
-    setTarjetaDialog(false);
-    setEditTarjeta(null);
+    setTarjetaDialog(false); setEditTarjeta(null);
     setFormTarjeta({ nombre: '', ultimos4: '', banco: '' });
     toast({ title: editTarjeta !== null ? '✅ Tarjeta actualizada' : '✅ Tarjeta añadida' });
   };
 
-  const deleteCuenta = async (idx: number) => {
-    const nuevas = cuentas.filter((_, i) => i !== idx);
-    await saveCuentas(nuevas);
-    toast({ title: 'Cuenta eliminada' });
-  };
+  const deleteCuenta  = async (idx: number) => { await saveCuentas(cuentas.filter((_, i) => i !== idx)); toast({ title: 'Cuenta eliminada' }); };
+  const deleteTarjeta = async (idx: number) => { await saveTarjetas(tarjetas.filter((_, i) => i !== idx)); toast({ title: 'Tarjeta eliminada' }); };
 
-  const deleteTarjeta = async (idx: number) => {
-    const nuevas = tarjetas.filter((_, i) => i !== idx);
-    await saveTarjetas(nuevas);
-    toast({ title: 'Tarjeta eliminada' });
-  };
-
+  // ── CREAR USUARIO ────────────────────────────────────────────
   const addUser = async () => {
     if (!newEmail || !newPass) { toast({ title: 'Email y contraseña requeridos', variant: 'destructive' }); return; }
     try {
       const { data, error } = await supabase.auth.signUp({
         email: newEmail, password: newPass,
-        options: { data: { nombre: newNombre } }
+        options: { data: { nombre: newNombre } },
       });
       if (error) throw error;
       if (data.user) {
+        // Asignar rol
         await db.from('user_roles').insert({ user_id: data.user.id, role: newRole });
+
+        // Solo insertar permisos si es empleado
+        if (newRole === 'employee') {
+          const rows = MODULOS.map(m => ({
+            user_id: data.user!.id,
+            modulo:  m.key,
+            activo:  newPermisos.has(m.key),
+          }));
+          await db.from('user_permisos').insert(rows);
+        }
       }
       toast({ title: '✅ Usuario creado' });
       setRoleDialog(false);
       setNewEmail(''); setNewPass(''); setNewNombre('');
+      setNewPermisos(new Set(MODULOS.map(m => m.key)));
+      setShowNewPermisos(false);
       loadUsers();
     } catch (err: any) {
       toast({ title: err.message, variant: 'destructive' });
     }
   };
 
+  // ── EDITAR PERMISOS ──────────────────────────────────────────
+  const openPermisos = async (usuario: any) => {
+    setPermisosUsuario(usuario);
+    const { data } = await db.from('user_permisos')
+      .select('modulo, activo')
+      .eq('user_id', usuario.user_id);
+
+    if (data && data.length > 0) {
+      setPermisosActivos(new Set(data.filter((p: any) => p.activo).map((p: any) => p.modulo)));
+    } else {
+      // Si no tiene permisos aún, darle todos por defecto
+      setPermisosActivos(new Set(MODULOS.map(m => m.key)));
+    }
+    setPermisosDialog(true);
+  };
+
+  const savePermisos = async () => {
+    if (!permisosUsuario) return;
+    setSavingPermisos(true);
+    try {
+      const rows = MODULOS.map(m => ({
+        user_id: permisosUsuario.user_id,
+        modulo:  m.key,
+        activo:  permisosActivos.has(m.key),
+      }));
+      await db.from('user_permisos')
+        .upsert(rows, { onConflict: 'user_id,modulo' });
+
+      toast({ title: '✅ Permisos actualizados' });
+      setPermisosDialog(false);
+    } catch (err: any) {
+      toast({ title: err.message, variant: 'destructive' });
+    } finally {
+      setSavingPermisos(false);
+    }
+  };
+
+  const togglePermiso = (key: string, set: Set<string>, setter: (s: Set<string>) => void) => {
+    const nuevo = new Set(set);
+    if (nuevo.has(key)) { nuevo.delete(key); } else { nuevo.add(key); }
+    setter(nuevo);
+  };
+
+  // ── ELIMINAR USUARIO ─────────────────────────────────────────
   const deleteUser = async () => {
     if (!deleteUserId) return;
+    await db.from('user_permisos').delete().eq('user_id', deleteUserId);
     await db.from('user_roles').delete().eq('user_id', deleteUserId);
     await db.from('profiles').delete().eq('user_id', deleteUserId);
     setDeleteUserId(null);
@@ -156,8 +219,7 @@ export default function Configuracion() {
     toast({ title: 'Usuario eliminado' });
   };
 
-  const updateVal = (key: string, val: string) => setConfig(prev => ({ ...prev, [key]: val }));
-
+  // ── RENDER ───────────────────────────────────────────────────
   return (
     <div className="page-container">
       <h1 className="text-2xl font-bold flex items-center gap-2"><Settings className="h-6 w-6" /> Configuración</h1>
@@ -190,7 +252,6 @@ export default function Configuracion() {
 
         {/* CUENTAS Y TARJETAS */}
         <TabsContent value="pagos" className="mt-4 space-y-4">
-          {/* Cuentas bancarias */}
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
@@ -207,17 +268,10 @@ export default function Configuracion() {
                 <div className="space-y-2">
                   {cuentas.map((c, i) => (
                     <div key={i} className="flex items-center justify-between p-3 rounded-lg bg-secondary/50">
-                      <div>
-                        <p className="font-medium text-sm">{c.nombre}</p>
-                        <p className="text-xs text-muted-foreground">{c.tipo}</p>
-                      </div>
+                      <div><p className="font-medium text-sm">{c.nombre}</p><p className="text-xs text-muted-foreground">{c.tipo}</p></div>
                       <div className="flex gap-1">
-                        <Button variant="ghost" size="icon" onClick={() => { setFormCuenta({ banco: c.banco, ultimos4: c.ultimos4, tipo: c.tipo }); setEditCuenta(i); setCuentaDialog(true); }}>
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" onClick={() => deleteCuenta(i)}>
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
+                        <Button variant="ghost" size="icon" onClick={() => { setFormCuenta({ banco: c.banco, ultimos4: c.ultimos4, tipo: c.tipo }); setEditCuenta(i); setCuentaDialog(true); }}><Pencil className="h-4 w-4" /></Button>
+                        <Button variant="ghost" size="icon" onClick={() => deleteCuenta(i)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
                       </div>
                     </div>
                   ))}
@@ -226,7 +280,6 @@ export default function Configuracion() {
             </CardContent>
           </Card>
 
-          {/* Tarjetas */}
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
@@ -243,17 +296,10 @@ export default function Configuracion() {
                 <div className="space-y-2">
                   {tarjetas.map((t, i) => (
                     <div key={i} className="flex items-center justify-between p-3 rounded-lg bg-secondary/50">
-                      <div>
-                        <p className="font-medium text-sm">{t.nombre}</p>
-                        {t.banco && <p className="text-xs text-muted-foreground">{t.banco}</p>}
-                      </div>
+                      <div><p className="font-medium text-sm">{t.nombre}</p>{t.banco && <p className="text-xs text-muted-foreground">{t.banco}</p>}</div>
                       <div className="flex gap-1">
-                        <Button variant="ghost" size="icon" onClick={() => { setFormTarjeta({ nombre: t.nombre, ultimos4: t.ultimos4, banco: t.banco }); setEditTarjeta(i); setTarjetaDialog(true); }}>
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" onClick={() => deleteTarjeta(i)}>
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
+                        <Button variant="ghost" size="icon" onClick={() => { setFormTarjeta({ nombre: t.nombre, ultimos4: t.ultimos4, banco: t.banco }); setEditTarjeta(i); setTarjetaDialog(true); }}><Pencil className="h-4 w-4" /></Button>
+                        <Button variant="ghost" size="icon" onClick={() => deleteTarjeta(i)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
                       </div>
                     </div>
                   ))}
@@ -279,21 +325,37 @@ export default function Configuracion() {
                     <TableHead>Nombre</TableHead>
                     <TableHead>Email</TableHead>
                     <TableHead>Rol</TableHead>
-                    <TableHead className="w-[60px]"></TableHead>
+                    <TableHead className="w-[100px]"></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {users.length === 0 && <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-6">Sin usuarios</TableCell></TableRow>}
+                  {users.length === 0 && (
+                    <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-6">Sin usuarios</TableCell></TableRow>
+                  )}
                   {users.map(u => (
                     <TableRow key={u.id}>
                       <TableCell className="font-medium">{u.nombre || '—'}</TableCell>
                       <TableCell className="text-muted-foreground text-sm">{u.email}</TableCell>
-                      <TableCell><Badge variant={u.role === 'owner' ? 'default' : 'outline'}>{u.role === 'owner' ? 'Propietario' : 'Empleado'}</Badge></TableCell>
+                      <TableCell>
+                        <Badge variant={u.role === 'owner' ? 'default' : 'outline'}>
+                          {u.role === 'owner' ? 'Propietario' : 'Empleado'}
+                        </Badge>
+                      </TableCell>
                       <TableCell>
                         {u.role !== 'owner' && (
-                          <Button variant="ghost" size="icon" onClick={() => setDeleteUserId(u.user_id)}>
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
+                          <div className="flex gap-1">
+                            {/* Botón editar permisos */}
+                            <Button
+                              variant="ghost" size="icon"
+                              title="Editar accesos"
+                              onClick={() => openPermisos(u)}
+                            >
+                              <Shield className="h-4 w-4 text-primary" />
+                            </Button>
+                            <Button variant="ghost" size="icon" onClick={() => setDeleteUserId(u.user_id)}>
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </div>
                         )}
                       </TableCell>
                     </TableRow>
@@ -319,7 +381,7 @@ export default function Configuracion() {
         </TabsContent>
       </Tabs>
 
-      {/* Dialog Cuenta Bancaria */}
+      {/* ── Dialog Cuenta Bancaria ── */}
       <Dialog open={cuentaDialog} onOpenChange={setCuentaDialog}>
         <DialogContent className="max-w-sm">
           <DialogHeader><DialogTitle>{editCuenta !== null ? 'Editar Cuenta' : 'Nueva Cuenta Bancaria'}</DialogTitle></DialogHeader>
@@ -330,10 +392,7 @@ export default function Configuracion() {
               <Label className="text-xs">Tipo de cuenta</Label>
               <Select value={formCuenta.tipo} onValueChange={v => setFormCuenta({ ...formCuenta, tipo: v })}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Corriente">Corriente</SelectItem>
-                  <SelectItem value="Ahorros">Ahorros</SelectItem>
-                </SelectContent>
+                <SelectContent><SelectItem value="Corriente">Corriente</SelectItem><SelectItem value="Ahorros">Ahorros</SelectItem></SelectContent>
               </Select>
             </div>
           </div>
@@ -344,7 +403,7 @@ export default function Configuracion() {
         </DialogContent>
       </Dialog>
 
-      {/* Dialog Tarjeta */}
+      {/* ── Dialog Tarjeta ── */}
       <Dialog open={tarjetaDialog} onOpenChange={setTarjetaDialog}>
         <DialogContent className="max-w-sm">
           <DialogHeader><DialogTitle>{editTarjeta !== null ? 'Editar Tarjeta' : 'Nueva Tarjeta'}</DialogTitle></DialogHeader>
@@ -360,7 +419,7 @@ export default function Configuracion() {
         </DialogContent>
       </Dialog>
 
-      {/* Dialog Nuevo Usuario */}
+      {/* ── Dialog Nuevo Usuario ── */}
       <Dialog open={roleDialog} onOpenChange={setRoleDialog}>
         <DialogContent className="max-w-sm">
           <DialogHeader><DialogTitle>Nuevo Usuario</DialogTitle></DialogHeader>
@@ -370,7 +429,7 @@ export default function Configuracion() {
             <div className="grid gap-1.5"><Label className="text-xs">Contraseña *</Label><Input type="password" value={newPass} onChange={e => setNewPass(e.target.value)} minLength={6} /></div>
             <div className="grid gap-1.5">
               <Label className="text-xs">Rol</Label>
-              <Select value={newRole} onValueChange={setNewRole}>
+              <Select value={newRole} onValueChange={v => { setNewRole(v); }}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="owner">Propietario</SelectItem>
@@ -378,6 +437,33 @@ export default function Configuracion() {
                 </SelectContent>
               </Select>
             </div>
+
+            {/* Checklist de módulos — solo visible si es empleado */}
+            {newRole === 'employee' && (
+              <div className="grid gap-2">
+                <button
+                  type="button"
+                  className="flex items-center justify-between text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+                  onClick={() => setShowNewPermisos(!showNewPermisos)}
+                >
+                  <span>Acceso a módulos ({newPermisos.size}/{MODULOS.length})</span>
+                  {showNewPermisos ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                </button>
+                {showNewPermisos && (
+                  <div className="rounded-lg border p-3 grid grid-cols-2 gap-2">
+                    {MODULOS.map(m => (
+                      <label key={m.key} className="flex items-center gap-2 cursor-pointer select-none">
+                        <Checkbox
+                          checked={newPermisos.has(m.key)}
+                          onCheckedChange={() => togglePermiso(m.key, newPermisos, setNewPermisos)}
+                        />
+                        <span className="text-xs">{m.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => setRoleDialog(false)}>Cancelar</Button>
@@ -386,11 +472,46 @@ export default function Configuracion() {
         </DialogContent>
       </Dialog>
 
-      {/* Confirmar eliminar usuario */}
+      {/* ── Dialog Editar Permisos ── */}
+      <Dialog open={permisosDialog} onOpenChange={setPermisosDialog}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Accesos — {permisosUsuario?.nombre || permisosUsuario?.email}</DialogTitle>
+          </DialogHeader>
+          <p className="text-xs text-muted-foreground -mt-2">
+            Selecciona los módulos a los que este empleado puede acceder.
+          </p>
+          <div className="rounded-lg border p-4 grid grid-cols-2 gap-3 my-2">
+            {MODULOS.map(m => (
+              <label key={m.key} className="flex items-center gap-2 cursor-pointer select-none">
+                <Checkbox
+                  checked={permisosActivos.has(m.key)}
+                  onCheckedChange={() => togglePermiso(m.key, permisosActivos, setPermisosActivos)}
+                />
+                <span className="text-sm">{m.label}</span>
+              </label>
+            ))}
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setPermisosDialog(false)}>Cancelar</Button>
+            <Button onClick={savePermisos} disabled={savingPermisos}>
+              {savingPermisos ? 'Guardando...' : 'Guardar accesos'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Confirmar eliminar usuario ── */}
       <AlertDialog open={!!deleteUserId} onOpenChange={() => setDeleteUserId(null)}>
         <AlertDialogContent>
-          <AlertDialogHeader><AlertDialogTitle>¿Eliminar usuario?</AlertDialogTitle><AlertDialogDescription>Se removerá su acceso al sistema.</AlertDialogDescription></AlertDialogHeader>
-          <AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={deleteUser}>Eliminar</AlertDialogAction></AlertDialogFooter>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar usuario?</AlertDialogTitle>
+            <AlertDialogDescription>Se removerá su acceso al sistema.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={deleteUser}>Eliminar</AlertDialogAction>
+          </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
     </div>
