@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Menu, LayoutDashboard, Users, Briefcase, UserCheck, Package, Wallet, FileBarChart, Settings, FileText, TrendingUp, Truck, LogOut, Megaphone, Calendar, Bell, X } from 'lucide-react';
+import { Menu, LayoutDashboard, Users, Briefcase, UserCheck, Package, Wallet, FileBarChart, Settings, FileText, TrendingUp, Truck, LogOut, Megaphone, Calendar, Bell, X, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import { usePermisos } from '@/hooks/usePermisos';
 import { useNotificaciones } from '@/hooks/useNotificaciones';
+import { usePWAInstall } from '@/hooks/usePWAInstall';
 
 const allNavItems = [
   { path: '/dashboard',     label: 'Dashboard',     icon: LayoutDashboard, ownerOnly: false, modulo: null },
@@ -32,6 +33,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { isOwner, signOut } = useAuth();
   const { tieneAcceso, loading: permisosLoading } = usePermisos();
   const { notifs, noLeidas, marcarLeida, marcarTodasLeidas } = useNotificaciones();
+  const { puedeInstalar, instalar } = usePWAInstall();
 
   const navItems = allNavItems.filter(item => {
     // Owner ve todo siempre
@@ -149,6 +151,16 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             </div>
           )}
         </div>
+        {/* Botón instalar PWA */}
+        {puedeInstalar && (
+          <div className="px-3 pb-3">
+            <button onClick={instalar}
+              className="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-primary/10 hover:bg-primary/20 transition-colors text-primary text-xs font-medium">
+              <Download className="h-4 w-4 shrink-0" />
+              Instalar como app
+            </button>
+          </div>
+        )}
       </aside>
 
       {/* Header móvil */}
@@ -160,6 +172,15 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           <SheetContent side="left" className="w-64 p-0">
             <BrandBlock />
             <div className="p-3"><NavItems /></div>
+            {puedeInstalar && (
+              <div className="px-3 pb-3">
+                <button onClick={instalar}
+                  className="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-primary/10 hover:bg-primary/20 transition-colors text-primary text-xs font-medium">
+                  <Download className="h-4 w-4 shrink-0" />
+                  Instalar como app
+                </button>
+              </div>
+            )}
           </SheetContent>
         </Sheet>
         <h1 className="text-sm font-bold text-primary truncate flex-1">Soluciones Decorativas JL</h1>
