@@ -22,7 +22,7 @@ const db = supabase as any;
 const categorias = ['Tela', 'Madera', 'Espuma', 'Pegamento', 'Herramienta', 'Acabado', 'Otro'];
 const unidades   = ['unidad', 'yarda', 'metro', 'pie', 'galón', 'plancha', 'caja', 'rollo'];
 const emptyItem  = { nombre_item: '', categoria: 'Tela', unidad: 'unidad', stock_actual: null as number | null, stock_minimo: null as number | null, costo_unitario: 0, ubicacion: '' };
-const emptyMov   = { id_item: '', tipo_movimiento: 'Entrada', cantidad: 0, motivo: '', fecha: new Date().toISOString().slice(0, 10), id_trabajo: '' };
+const emptyMov   = { id_item: '', tipo_movimiento: 'Entrada', cantidad: 0, motivo: '', fecha: new Date().toISOString().slice(0, 10), id_trabajo: null };
 
 // ── Muebles / Productos terminados ────────────────────────────
 const emptyMueble = { nombre: '', descripcion: '', precio: 0, stock: 1, disponible: true };
@@ -57,6 +57,7 @@ export default function Inventario() {
   const [fotoPreview, setFotoPreview] = useState<string | null>(null);
   const [fotoDialog, setFotoDialog] = useState<any>(null);
   const [movSearch, setMovSearch] = useState('');
+  const [movFiltro, setMovFiltro] = useState<'hoy'|'semana'|'mes'|'todos'>('mes');
   const fileRef = useRef<HTMLInputElement>(null);
 
   // ── Estado: muebles ──
@@ -150,7 +151,15 @@ export default function Inventario() {
       ? stockActual + cantidad
       : stockActual - cantidad;
     await updateRow('inventario', item.id, { stock_actual: newStock });
-    await insertRow('inventario_movimientos', { ...movForm, cantidad });
+    const movData: any = {
+      id_item:          movForm.id_item,
+      tipo_movimiento:  movForm.tipo_movimiento,
+      cantidad,
+      motivo:           movForm.motivo || null,
+      fecha:            movForm.fecha,
+      id_trabajo:       movForm.id_trabajo || null,
+    };
+    await insertRow('inventario_movimientos', movData);
     reload(); setMovDialog(false); setMovForm(emptyMov); setMovSearch('');
     toast({ title: `${movForm.tipo_movimiento} registrada` });
   };
@@ -393,32 +402,74 @@ export default function Inventario() {
         </TabsContent>
 
         {/* ══════════════ MOVIMIENTOS ══════════════ */}
-        <TabsContent value="movimientos" className="mt-4">
-          <div className="border rounded-lg overflow-x-auto bg-card">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Artículo</TableHead>
-                  <TableHead>Tipo</TableHead>
-                  <TableHead className="text-right">Cant.</TableHead>
-                  <TableHead className="hidden sm:table-cell">Motivo</TableHead>
-                  <TableHead>Fecha</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {movs.length === 0 && <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">Sin movimientos</TableCell></TableRow>}
-                {movs.map((m: any) => (
-                  <TableRow key={m.id}>
-                    <TableCell className="font-medium">{items.find((i: any) => i.id === m.id_item)?.nombre_item || '—'}</TableCell>
-                    <TableCell><Badge variant={m.tipo_movimiento === 'Entrada' ? 'default' : 'destructive'}>{m.tipo_movimiento}</Badge></TableCell>
-                    <TableCell className="text-right">{m.cantidad}</TableCell>
-                    <TableCell className="hidden sm:table-cell text-muted-foreground">{m.motivo}</TableCell>
-                    <TableCell className="text-xs text-muted-foreground">{formatDate(m.fecha)}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+        <TabsContent value="movimientos" className="mt-4 space-y-3">
+          {/* Filtro de período */}
+          <div className="flex gap-2 flex-wrap">
+            {(['hoy','semana','mes','todos'] as const).map(f => (
+              <button key={f} onClick={() => setMovFiltro(f)}
+                className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors border
+                  ${movFiltro === f ? 'bg-primary text-primary-foreground border-primary' : 'bg-card border-border hover:bg-secondary'}`}>
+                {f === 'hoy' ? 'Hoy' : f === 'semana' ? 'Esta semana' : f === 'mes' ? 'Este mes' : 'Todos'}
+              </button>
+            ))}
           </div>
+
+          {/* Resumen entradas/salidas del período */}
+          {(() => {
+            const hoy = new Date();
+            const filtrados = movs.filter((m: any) => {
+              if (movFiltro === 'todos') return true;
+              const fecha = new Date(m.fecha + 'T12:00:00');
+              if (movFiltro === 'hoy') return m.fecha === hoy.toISOString().slice(0,10);
+              if (movFiltro === 'semana') {
+                const lunes = new Date(hoy); lunes.setDate(hoy.getDate() - hoy.getDay() + 1);
+                return fecha >= lunes;
+              }
+              if (movFiltro === 'mes') return m.fecha?.startsWith(`${hoy.getFullYear()}-${String(hoy.getMonth()+1).padStart(2,'0')}`);
+              return true;
+            });
+            const entradas = filtrados.filter((m: any) => m.tipo_movimiento === 'Entrada').reduce((s: number, m: any) => s + (m.cantidad || 0), 0);
+            const salidas  = filtrados.filter((m: any) => m.tipo_movimiento === 'Salida').reduce((s: number, m: any) => s + (m.cantidad || 0), 0);
+            return (
+              <>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="rounded-xl border bg-green-50 dark:bg-green-950/20 p-3 text-center">
+                    <p className="text-xs text-muted-foreground mb-0.5">Entradas</p>
+                    <p className="text-xl font-bold text-green-600">+{entradas}</p>
+                  </div>
+                  <div className="rounded-xl border bg-red-50 dark:bg-red-950/20 p-3 text-center">
+                    <p className="text-xs text-muted-foreground mb-0.5">Salidas</p>
+                    <p className="text-xl font-bold text-destructive">-{salidas}</p>
+                  </div>
+                </div>
+                <div className="border rounded-lg overflow-x-auto bg-card">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Artículo</TableHead>
+                        <TableHead>Tipo</TableHead>
+                        <TableHead className="text-right">Cant.</TableHead>
+                        <TableHead className="hidden sm:table-cell">Motivo</TableHead>
+                        <TableHead>Fecha</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filtrados.length === 0 && <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">Sin movimientos en este período</TableCell></TableRow>}
+                      {[...filtrados].reverse().map((m: any) => (
+                        <TableRow key={m.id}>
+                          <TableCell className="font-medium">{items.find((i: any) => i.id === m.id_item)?.nombre_item || '—'}</TableCell>
+                          <TableCell><Badge variant={m.tipo_movimiento === 'Entrada' ? 'default' : 'destructive'}>{m.tipo_movimiento}</Badge></TableCell>
+                          <TableCell className="text-right font-medium">{m.tipo_movimiento === 'Entrada' ? '+' : '-'}{m.cantidad}</TableCell>
+                          <TableCell className="hidden sm:table-cell text-muted-foreground">{m.motivo || '—'}</TableCell>
+                          <TableCell className="text-xs text-muted-foreground">{formatDate(m.fecha)}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </>
+            );
+          })()}
         </TabsContent>
       </Tabs>
 
