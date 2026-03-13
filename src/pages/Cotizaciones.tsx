@@ -89,8 +89,8 @@ export default function Cotizaciones() {
     const abono = parseFloat(abonoMonto);
     const abonoVal = !isNaN(abono) && abono > 0 ? abono : null;
 
-    // 1. Actualizar estado cotización
-    await updateRow('cotizaciones', cot.id, { estado: 'Aprobada', ...(abonoVal ? { abono: abonoVal } : {}) });
+    // 1. Actualizar estado cotización (solo el estado, abono vive en trabajos)
+    await updateRow('cotizaciones', cot.id, { estado: 'Aprobada' });
 
     // 2. Crear trabajo automáticamente
     const cl = clientes.find((c: any) => c.id === cot.id_cliente);
