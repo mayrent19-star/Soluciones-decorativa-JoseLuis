@@ -109,13 +109,15 @@ export default function Cotizaciones() {
 
     // 3. Registrar abono en trabajo_pagos si hubo abono
     if (abonoVal && nuevoTrabajo?.id) {
-      await db.from('trabajo_pagos').insert({
-        id_trabajo: nuevoTrabajo.id,
-        monto:  abonoVal,
-        metodo: abonoMetodo,
-        fecha:  new Date().toISOString().slice(0, 10),
-        notas:  'Abono inicial al aprobar cotización',
-      }).catch(() => {});
+      try {
+        await db.from('trabajo_pagos').insert({
+          id_trabajo: nuevoTrabajo.id,
+          monto:  abonoVal,
+          metodo: abonoMetodo,
+          fecha:  new Date().toISOString().slice(0, 10),
+          notas:  'Abono inicial al aprobar cotización',
+        });
+      } catch (_) {}
     }
 
     setAbonoMonto(''); setAbonoMetodo('Efectivo');
