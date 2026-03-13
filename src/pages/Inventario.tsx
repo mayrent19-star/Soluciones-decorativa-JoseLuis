@@ -21,7 +21,7 @@ const db = supabase as any;
 // ── Materia prima ──────────────────────────────────────────────
 const categorias = ['Tela', 'Madera', 'Espuma', 'Pegamento', 'Herramienta', 'Acabado', 'Otro'];
 const unidades   = ['unidad', 'yarda', 'metro', 'pie', 'galón', 'plancha', 'caja', 'rollo'];
-const emptyItem  = { nombre_item: '', categoria: 'Tela', unidad: 'unidad', stock_actual: 0, stock_minimo: 0, costo_unitario: 0, ubicacion: '' };
+const emptyItem  = { nombre_item: '', categoria: 'Tela', unidad: 'unidad', stock_actual: null as number | null, stock_minimo: null as number | null, costo_unitario: 0, ubicacion: '' };
 const emptyMov   = { id_item: '', tipo_movimiento: 'Entrada', cantidad: 0, motivo: '', fecha: new Date().toISOString().slice(0, 10), id_trabajo: '' };
 
 // ── Muebles / Productos terminados ────────────────────────────
@@ -56,6 +56,7 @@ export default function Inventario() {
   const [fotoFile, setFotoFile]     = useState<File | null>(null);
   const [fotoPreview, setFotoPreview] = useState<string | null>(null);
   const [fotoDialog, setFotoDialog] = useState<any>(null);
+  const [movSearch, setMovSearch] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
 
   // ── Estado: muebles ──
@@ -241,8 +242,8 @@ export default function Inventario() {
         <TabsContent value="articulos" className="mt-4 space-y-4">
           {isOwner && (
             <div className="flex gap-2 flex-wrap justify-end">
-              <Button variant="outline" onClick={() => { setMovForm({ ...emptyMov, tipo_movimiento: 'Entrada' }); setMovDialog(true); }}><ArrowDownToLine className="h-4 w-4 mr-1" />Entrada</Button>
-              <Button variant="outline" onClick={() => { setMovForm({ ...emptyMov, tipo_movimiento: 'Salida' }); setMovDialog(true); }}><ArrowUpFromLine className="h-4 w-4 mr-1" />Salida</Button>
+              <Button variant="outline" onClick={() => { setMovForm({ ...emptyMov, tipo_movimiento: 'Entrada' }); setMovSearch(''); setMovDialog(true); }}><ArrowDownToLine className="h-4 w-4 mr-1" />Entrada</Button>
+              <Button variant="outline" onClick={() => { setMovForm({ ...emptyMov, tipo_movimiento: 'Salida' }); setMovSearch(''); setMovDialog(true); }}><ArrowUpFromLine className="h-4 w-4 mr-1" />Salida</Button>
               <Button onClick={() => { setForm(emptyItem); setFotoFile(null); setFotoPreview(null); setDialogOpen(true); }}><Plus className="h-4 w-4 mr-1" />Nuevo</Button>
             </div>
           )}
@@ -442,8 +443,8 @@ export default function Inventario() {
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
-              <div className="grid gap-1.5"><Label className="text-xs">Stock Actual</Label><Input type="number" value={form.stock_actual || 0} onChange={e => setForm({ ...form, stock_actual: +e.target.value })} /></div>
-              <div className="grid gap-1.5"><Label className="text-xs">Stock Mínimo</Label><Input type="number" value={form.stock_minimo || 0} onChange={e => setForm({ ...form, stock_minimo: +e.target.value })} /></div>
+              <div className="grid gap-1.5"><Label className="text-xs">Stock Actual</Label><Input type="number" placeholder="0" value={form.stock_actual ?? ''} onChange={e => setForm({ ...form, stock_actual: e.target.value === '' ? null : +e.target.value })} /></div>
+              <div className="grid gap-1.5"><Label className="text-xs">Stock Mínimo</Label><Input type="number" placeholder="0" value={form.stock_minimo ?? ''} onChange={e => setForm({ ...form, stock_minimo: e.target.value === '' ? null : +e.target.value })} /></div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-1.5"><Label className="text-xs">Costo Unit.</Label><Input type="number" value={form.costo_unitario || ''} onChange={e => setForm({ ...form, costo_unitario: +e.target.value || 0 })} /></div>
@@ -472,7 +473,23 @@ export default function Inventario() {
             <div className="grid gap-1.5"><Label className="text-xs">Artículo *</Label>
               <Select value={movForm.id_item} onValueChange={v => setMovForm({ ...movForm, id_item: v })}>
                 <SelectTrigger><SelectValue placeholder="Seleccionar" /></SelectTrigger>
-                <SelectContent>{items.map((i: any) => <SelectItem key={i.id} value={i.id}>{i.nombre_item} (stock: {i.stock_actual})</SelectItem>)}</SelectContent>
+                <SelectContent>
+                  <div className="px-2 pb-1 pt-1 sticky top-0 bg-popover z-10">
+                    <Input
+                      placeholder="Buscar artículo..."
+                      value={movSearch}
+                      onChange={e => setMovSearch(e.target.value)}
+                      className="h-8 text-sm"
+                      onClick={e => e.stopPropagation()}
+                    />
+                  </div>
+                  {items
+                    .filter((i: any) => i.nombre_item?.toLowerCase().includes(movSearch.toLowerCase()))
+                    .map((i: any) => (
+                      <SelectItem key={i.id} value={i.id}>{i.nombre_item} (stock: {i.stock_actual ?? 0})</SelectItem>
+                    ))
+                  }
+                </SelectContent>
               </Select>
             </div>
             <div className="grid grid-cols-2 gap-4">
@@ -500,15 +517,37 @@ export default function Inventario() {
               <Badge variant="outline" className="font-normal">{fotoDialog?.categoria}</Badge>
             </DialogTitle>
           </DialogHeader>
-          {fotoDialog?.foto_url && (
+          {fotoDialog && (
             <div className="space-y-3">
-              <img src={fotoDialog.foto_url} alt={fotoDialog.nombre_item} className="w-full rounded-lg object-contain max-h-80 border bg-secondary/20" />
+              {fotoDialog.foto_url && (
+                <img src={fotoDialog.foto_url} alt={fotoDialog.nombre_item} className="w-full rounded-lg object-contain max-h-72 border bg-secondary/20" />
+              )}
               <div className="grid grid-cols-2 gap-2 text-sm">
-                <div><span className="text-muted-foreground">Stock:</span> <span className="font-semibold">{fotoDialog.stock_actual} {fotoDialog.unidad}</span></div>
-                <div><span className="text-muted-foreground">Mínimo:</span> <span className="font-semibold">{fotoDialog.stock_minimo}</span></div>
+                <div><span className="text-muted-foreground">Stock:</span> <span className="font-semibold">{fotoDialog.stock_actual ?? 0} {fotoDialog.unidad}</span></div>
+                <div><span className="text-muted-foreground">Mínimo:</span> <span className="font-semibold">{fotoDialog.stock_minimo ?? 0}</span></div>
                 {fotoDialog.costo_unitario > 0 && <div><span className="text-muted-foreground">Costo:</span> <span className="font-semibold">{formatCurrency(fotoDialog.costo_unitario)}</span></div>}
                 {fotoDialog.ubicacion && <div><span className="text-muted-foreground">Ubicación:</span> <span className="font-semibold">{fotoDialog.ubicacion}</span></div>}
               </div>
+              {isOwner && (
+                <div className="flex gap-2 pt-1">
+                  <Button className="flex-1 gap-2 bg-green-600 hover:bg-green-700" onClick={() => {
+                    setMovForm({ ...emptyMov, tipo_movimiento: 'Entrada', id_item: fotoDialog.id });
+                    setMovSearch('');
+                    setFotoDialog(null);
+                    setMovDialog(true);
+                  }}>
+                    <ArrowDownToLine className="h-4 w-4" />Entrada
+                  </Button>
+                  <Button variant="destructive" className="flex-1 gap-2" onClick={() => {
+                    setMovForm({ ...emptyMov, tipo_movimiento: 'Salida', id_item: fotoDialog.id });
+                    setMovSearch('');
+                    setFotoDialog(null);
+                    setMovDialog(true);
+                  }}>
+                    <ArrowUpFromLine className="h-4 w-4" />Salida
+                  </Button>
+                </div>
+              )}
             </div>
           )}
         </DialogContent>
