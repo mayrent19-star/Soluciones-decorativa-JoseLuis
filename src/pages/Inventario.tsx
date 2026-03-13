@@ -136,20 +136,22 @@ export default function Inventario() {
   };
 
   const saveMov = async () => {
-    if (!movForm.id_item || !movForm.cantidad || movForm.cantidad <= 0) {
-      toast({ title: 'Completa los campos', variant: 'destructive' }); return;
+    const cantidad = Number(movForm.cantidad);
+    if (!movForm.id_item || !cantidad || cantidad <= 0) {
+      toast({ title: 'Selecciona un artículo e ingresa la cantidad', variant: 'destructive' }); return;
     }
     const item = items.find((i: any) => i.id === movForm.id_item);
     if (!item) return;
-    if (movForm.tipo_movimiento === 'Salida' && item.stock_actual < movForm.cantidad) {
-      toast({ title: `Stock insuficiente. Disponible: ${item.stock_actual}`, variant: 'destructive' }); return;
+    const stockActual = item.stock_actual ?? 0;
+    if (movForm.tipo_movimiento === 'Salida' && stockActual < cantidad) {
+      toast({ title: `Stock insuficiente. Disponible: ${stockActual}`, variant: 'destructive' }); return;
     }
     const newStock = movForm.tipo_movimiento === 'Entrada'
-      ? item.stock_actual + movForm.cantidad
-      : item.stock_actual - movForm.cantidad;
+      ? stockActual + cantidad
+      : stockActual - cantidad;
     await updateRow('inventario', item.id, { stock_actual: newStock });
-    await insertRow('inventario_movimientos', movForm);
-    reload(); setMovDialog(false); setMovForm(emptyMov);
+    await insertRow('inventario_movimientos', { ...movForm, cantidad });
+    reload(); setMovDialog(false); setMovForm(emptyMov); setMovSearch('');
     toast({ title: `${movForm.tipo_movimiento} registrada` });
   };
 
