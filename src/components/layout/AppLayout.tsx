@@ -95,61 +95,59 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     </button>
   );
 
-  const PanelNotificaciones = () => (
-    <div className="absolute right-0 top-full mt-2 w-80 bg-card border rounded-xl shadow-lg z-50 overflow-hidden">
-      <div className="flex items-center justify-between px-4 py-3 border-b">
-        <span className="text-sm font-semibold">Notificaciones</span>
-        <div className="flex items-center gap-2">
-          {noLeidas > 0 && (
-            <button onClick={marcarTodasLeidas} className="text-xs text-muted-foreground hover:text-foreground">
-              Marcar todas
-            </button>
-          )}
-          <button onClick={() => setCampanOpen(false)}><X className="h-4 w-4 text-muted-foreground" /></button>
-        </div>
-      </div>
-      <div className="max-h-[400px] overflow-y-auto">
-        {notifs.length === 0 && (
-          <div className="py-8 text-center text-sm text-muted-foreground">Sin notificaciones pendientes</div>
-        )}
-        {notifs.map(n => (
-          <div
-            key={n.id}
-            onClick={() => {
-              marcarLeida(n.id);
-              setCampanOpen(false);
-              if (n.link) navigate(n.link);
-            }}
-            className={`flex gap-3 px-4 py-3 border-b cursor-pointer hover:bg-secondary/50 transition-colors ${n.leida ? 'opacity-50' : ''}`}
-          >
-            <div className={`w-1.5 rounded-full shrink-0 mt-1 self-stretch ${n.prioridad === 'alta' ? 'bg-destructive' : n.prioridad === 'media' ? 'bg-amber-500' : 'bg-muted-foreground'}`} />
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-semibold">{n.titulo}</p>
-              <p className="text-xs text-muted-foreground truncate">{n.descripcion}</p>
-              <p className="text-[10px] text-muted-foreground mt-0.5">{n.fecha}</p>
-            </div>
-            {!n.leida && <div className="w-2 h-2 rounded-full bg-primary shrink-0 mt-1.5" />}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
 
   return (
     <div className="flex min-h-screen bg-background">
+      {/* Overlay para cerrar campana al hacer clic fuera */}
+      {campanOpen && (
+        <div className="fixed inset-0 z-40" onClick={() => setCampanOpen(false)} />
+      )}
+
       {/* Sidebar desktop */}
       <aside className="hidden lg:flex w-64 flex-col fixed h-full border-r border-border bg-card z-40">
         <BrandBlock />
         <div className="flex-1 overflow-y-auto p-3"><NavItems /></div>
         {/* Campana en sidebar desktop */}
-        <div className="p-3 border-t relative">
+        <div className="p-3 border-t relative z-50">
           <div className="flex items-center gap-2">
             <CampanaBtn />
             <span className="text-xs text-muted-foreground">
               {noLeidas > 0 ? `${noLeidas} sin leer` : 'Todo al día'}
             </span>
           </div>
-          {campanOpen && <PanelNotificaciones />}
+          {campanOpen && (
+            <div className="absolute left-0 bottom-full mb-2 w-80 bg-card border rounded-xl shadow-xl z-50 overflow-hidden">
+              <div className="flex items-center justify-between px-4 py-3 border-b">
+                <span className="text-sm font-semibold">Notificaciones</span>
+                <div className="flex items-center gap-2">
+                  {noLeidas > 0 && (
+                    <button onClick={marcarTodasLeidas} className="text-xs text-muted-foreground hover:text-foreground">
+                      Marcar todas
+                    </button>
+                  )}
+                  <button onClick={() => setCampanOpen(false)}><X className="h-4 w-4 text-muted-foreground" /></button>
+                </div>
+              </div>
+              <div className="max-h-[400px] overflow-y-auto">
+                {notifs.length === 0 && (
+                  <div className="py-8 text-center text-sm text-muted-foreground">Sin notificaciones pendientes</div>
+                )}
+                {notifs.map(n => (
+                  <div key={n.id}
+                    onClick={() => { marcarLeida(n.id); setCampanOpen(false); if (n.link) navigate(n.link); }}
+                    className={`flex gap-3 px-4 py-3 border-b cursor-pointer hover:bg-secondary/50 transition-colors ${n.leida ? 'opacity-50' : ''}`}>
+                    <div className={`w-1.5 rounded-full shrink-0 mt-1 self-stretch ${n.prioridad === 'alta' ? 'bg-destructive' : n.prioridad === 'media' ? 'bg-amber-500' : 'bg-muted-foreground'}`} />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-semibold">{n.titulo}</p>
+                      <p className="text-xs text-muted-foreground truncate">{n.descripcion}</p>
+                      <p className="text-[10px] text-muted-foreground mt-0.5">{n.fecha}</p>
+                    </div>
+                    {!n.leida && <div className="w-2 h-2 rounded-full bg-primary shrink-0 mt-1.5" />}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </aside>
 
@@ -168,7 +166,39 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         {/* Campana móvil */}
         <div className="relative shrink-0">
           <CampanaBtn />
-          {campanOpen && <PanelNotificaciones />}
+          {campanOpen && (
+            <div className="absolute right-0 top-full mt-2 w-80 bg-card border rounded-xl shadow-xl z-50 overflow-hidden">
+              <div className="flex items-center justify-between px-4 py-3 border-b">
+                <span className="text-sm font-semibold">Notificaciones</span>
+                <div className="flex items-center gap-2">
+                  {noLeidas > 0 && (
+                    <button onClick={marcarTodasLeidas} className="text-xs text-muted-foreground hover:text-foreground">
+                      Marcar todas
+                    </button>
+                  )}
+                  <button onClick={() => setCampanOpen(false)}><X className="h-4 w-4 text-muted-foreground" /></button>
+                </div>
+              </div>
+              <div className="max-h-[60vh] overflow-y-auto">
+                {notifs.length === 0 && (
+                  <div className="py-8 text-center text-sm text-muted-foreground">Sin notificaciones pendientes</div>
+                )}
+                {notifs.map(n => (
+                  <div key={n.id}
+                    onClick={() => { marcarLeida(n.id); setCampanOpen(false); if (n.link) navigate(n.link); }}
+                    className={`flex gap-3 px-4 py-3 border-b cursor-pointer hover:bg-secondary/50 transition-colors ${n.leida ? 'opacity-50' : ''}`}>
+                    <div className={`w-1.5 rounded-full shrink-0 mt-1 self-stretch ${n.prioridad === 'alta' ? 'bg-destructive' : n.prioridad === 'media' ? 'bg-amber-500' : 'bg-muted-foreground'}`} />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-semibold">{n.titulo}</p>
+                      <p className="text-xs text-muted-foreground truncate">{n.descripcion}</p>
+                      <p className="text-[10px] text-muted-foreground mt-0.5">{n.fecha}</p>
+                    </div>
+                    {!n.leida && <div className="w-2 h-2 rounded-full bg-primary shrink-0 mt-1.5" />}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </header>
 
