@@ -227,8 +227,8 @@ export default function Cotizaciones() {
                 {cotItems.map((item, idx) => (
                   <div key={idx} className="grid grid-cols-12 gap-2 items-end">
                     <div className="col-span-5"><Input placeholder="Descripción" value={item.descripcion} onChange={e => updateItem(idx, 'descripcion', e.target.value)} /></div>
-                    <div className="col-span-2"><Input type="number" placeholder="Cant" value={item.cantidad} onChange={e => updateItem(idx, 'cantidad', +e.target.value)} /></div>
-                    <div className="col-span-3"><Input type="number" placeholder="Precio" value={item.precio_unitario} onChange={e => updateItem(idx, 'precio_unitario', +e.target.value)} /></div>
+                    <div className="col-span-2"><Input type="number" placeholder="Cant" value={item.cantidad === 0 ? '' : item.cantidad} onChange={e => updateItem(idx, 'cantidad', e.target.value === '' ? 0 : +e.target.value)} /></div>
+                    <div className="col-span-3"><Input type="number" placeholder="Precio" value={item.precio_unitario === 0 ? '' : item.precio_unitario} onChange={e => updateItem(idx, 'precio_unitario', e.target.value === '' ? 0 : +e.target.value)} /></div>
                     <div className="col-span-2 text-right text-sm font-medium">
                       {formatCurrency(item.cantidad * item.precio_unitario)}
                       {cotItems.length > 1 && <Button variant="ghost" size="icon" className="h-6 w-6 ml-1" onClick={() => removeItem(idx)}><Trash2 className="h-3 w-3 text-destructive" /></Button>}
