@@ -83,25 +83,44 @@ export default function Cotizaciones() {
     toast({ title: 'Cotización guardada' });
   };
 
-  // Aprobar cotización — cambia estado y registra abono si hay
+  // Aprobar cotización → crea trabajo automáticamente + registra abono si hay
   const handleAprobar = async (cot: any) => {
     const db = supabase as any;
-    await updateRow('cotizaciones', cot.id, { estado: 'Aprobada' });
     const abono = parseFloat(abonoMonto);
-    if (!isNaN(abono) && abono > 0) {
+    const abonoVal = !isNaN(abono) && abono > 0 ? abono : null;
+
+    // 1. Actualizar estado cotización
+    await updateRow('cotizaciones', cot.id, { estado: 'Aprobada', ...(abonoVal ? { abono: abonoVal } : {}) });
+
+    // 2. Crear trabajo automáticamente
+    const cl = clientes.find((c: any) => c.id === cot.id_cliente);
+    const trabajoData: any = {
+      id_cliente:           cot.id_cliente,
+      descripcion_trabajo:  cot.notas || `Trabajo cotizado — ${cl?.nombre_completo || ''}`,
+      categoria:            'Tapicería',
+      estado:               'En proceso',
+      fecha_inicio:         new Date().toISOString().slice(0, 10),
+      monto_final:          cot.total,
+      abono:                abonoVal,
+      tipo_trabajo:         'Reparación',
+      notas:                `Generado desde cotización ${cot.numero_cotizacion}`,
+    };
+    const nuevoTrabajo: any = await insertRow('trabajos', trabajoData);
+
+    // 3. Registrar abono en trabajo_pagos si hubo abono
+    if (abonoVal && nuevoTrabajo?.id) {
       await db.from('trabajo_pagos').insert({
-        // Nota: si existe un trabajo vinculado, registrar allá. Aquí guardamos en cotización.
-        id_cotizacion: cot.id,
-        monto: abono,
+        id_trabajo: nuevoTrabajo.id,
+        monto:  abonoVal,
         metodo: abonoMetodo,
-        fecha: new Date().toISOString().slice(0, 10),
-        notas: 'Abono al aprobar cotización',
-      }).catch(() => {}); // tabla opcional
-      await updateRow('cotizaciones', cot.id, { estado: 'Aprobada', abono });
+        fecha:  new Date().toISOString().slice(0, 10),
+        notas:  'Abono inicial al aprobar cotización',
+      }).catch(() => {});
     }
+
     setAbonoMonto(''); setAbonoMetodo('Efectivo');
     load(); setDetailDialog(null);
-    toast({ title: '✅ Cotización aprobada' });
+    toast({ title: '✅ Cotización aprobada — Trabajo creado automáticamente' });
   };
 
   const handleCancelar = async (cot: any) => {
