@@ -35,6 +35,7 @@ export default function Cotizaciones() {
     fecha: new Date().toISOString().slice(0, 10), notas: ''
   });
   const [cotItems, setCotItems] = useState<any[]>([{ descripcion: '', cantidad: 1, precio_unitario: 0 }]);
+  const [aplicarItbis, setAplicarItbis] = useState(false);
 
   // Abono al aprobar
   const [abonoMonto, setAbonoMonto]   = useState<string>('');
@@ -55,7 +56,7 @@ export default function Cotizaciones() {
   });
 
   const subtotal = cotItems.reduce((s: number, i: any) => s + (i.cantidad * i.precio_unitario), 0);
-  const itbis    = subtotal * 0.18;
+  const itbis    = aplicarItbis ? subtotal * 0.18 : 0;
   const total    = subtotal + itbis;
 
   const addItem    = () => setCotItems([...cotItems, { descripcion: '', cantidad: 1, precio_unitario: 0 }]);
@@ -135,12 +136,14 @@ export default function Cotizaciones() {
     setForm(cot);
     const { data } = await supabase.from('cotizacion_items').select('*').eq('id_cotizacion', cot.id);
     setCotItems(data?.length ? data.map((d: any) => ({ descripcion: d.descripcion, cantidad: d.cantidad, precio_unitario: d.precio_unitario })) : [{ descripcion: '', cantidad: 1, precio_unitario: 0 }]);
+    setAplicarItbis(cot.itbis > 0);
     setDialogOpen(true);
   };
 
   const openNew = () => {
     setForm({ id_cliente: '', estado: 'Pendiente', fecha: new Date().toISOString().slice(0, 10), notas: '' });
     setCotItems([{ descripcion: '', cantidad: 1, precio_unitario: 0 }]);
+    setAplicarItbis(false);
     setDialogOpen(true);
   };
 
@@ -163,7 +166,7 @@ export default function Cotizaciones() {
     <div class="header"><div class="brand"><img src="${window.location.origin}/icons/icon-128.png" /><div class="brand-info"><h1>Soluciones Decorativas José Luis</h1><p>Tapicería & Ebanistería</p><p>RNC: ${cot.rnc_empresa || ''}</p></div></div><div class="inv-info"><h2>COTIZACIÓN</h2><p>${cot.numero_cotizacion}</p><p>Fecha: ${formatDate(cot.fecha)}</p>${cot.fecha_vencimiento ? `<p>Válida hasta: ${formatDate(cot.fecha_vencimiento)}</p>` : ''}</div></div>
     <div class="section"><div class="section-title">Cliente</div><div class="grid"><div class="field"><label>Nombre</label><p>${cl?.nombre_completo || ''}</p></div><div class="field"><label>RNC</label><p>${cot.rnc_cliente || '—'}</p></div><div class="field"><label>Teléfono</label><p>${cl?.telefono || ''}</p></div><div class="field"><label>Dirección</label><p>${cl?.direccion || ''}</p></div></div></div>
     <div class="section"><div class="section-title">Detalle</div><table class="items"><thead><tr><th>Descripción</th><th class="text-right">Cant.</th><th class="text-right">P. Unit.</th><th class="text-right">Total</th></tr></thead><tbody>${(citems || []).map((i: any) => `<tr><td>${i.descripcion}</td><td class="text-right">${i.cantidad}</td><td class="text-right">${formatCurrency(i.precio_unitario)}</td><td class="text-right">${formatCurrency(i.cantidad * i.precio_unitario)}</td></tr>`).join('')}</tbody></table></div>
-    <div class="totals"><table class="totals-table"><tr><td>Subtotal</td><td class="text-right">${formatCurrency(cot.subtotal)}</td></tr><tr><td>ITBIS 18%</td><td class="text-right">${formatCurrency(cot.itbis)}</td></tr><tr class="total"><td><strong>TOTAL</strong></td><td class="text-right"><strong>${formatCurrency(cot.total)}</strong></td></tr></table></div>
+    <div class="totals"><table class="totals-table"><tr><td>Subtotal</td><td class="text-right">${formatCurrency(cot.subtotal)}</td></tr>${cot.itbis > 0 ? `<tr><td>ITBIS 18%</td><td class="text-right">${formatCurrency(cot.itbis)}</td></tr>` : ''}<tr class="total"><td><strong>TOTAL</strong></td><td class="text-right"><strong>${formatCurrency(cot.total)}</strong></td></tr></table></div>
     ${garantia ? `<div class="warranty"><strong>Garantía:</strong> ${garantia}</div>` : ''}
     ${cot.notas ? `<div class="warranty" style="margin-top:10px"><strong>Notas:</strong> ${cot.notas}</div>` : ''}
     <div class="footer">Soluciones Decorativas José Luis — Tapicería & Ebanistería</div>
@@ -258,8 +261,18 @@ export default function Cotizaciones() {
                 ))}
               </div>
               <div className="mt-3 text-right space-y-1">
+                <div className="flex items-center justify-end gap-2 mb-2">
+                  <input
+                    type="checkbox"
+                    id="aplicar-itbis"
+                    checked={aplicarItbis}
+                    onChange={e => setAplicarItbis(e.target.checked)}
+                    className="h-4 w-4 rounded border-gray-300 cursor-pointer"
+                  />
+                  <label htmlFor="aplicar-itbis" className="text-sm cursor-pointer select-none">Aplicar ITBIS (18%)</label>
+                </div>
                 <p className="text-sm">Subtotal: <span className="font-medium">{formatCurrency(subtotal)}</span></p>
-                <p className="text-sm">ITBIS 18%: <span className="font-medium">{formatCurrency(itbis)}</span></p>
+                {aplicarItbis && <p className="text-sm">ITBIS 18%: <span className="font-medium">{formatCurrency(itbis)}</span></p>}
                 <p className="text-base font-bold text-primary">Total: {formatCurrency(total)}</p>
               </div>
             </div>
