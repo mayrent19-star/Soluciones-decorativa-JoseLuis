@@ -22,6 +22,47 @@ const moduloLabel: Record<string, string> = {
   inventario: '📦 Inventario', caja: '💰 Caja', empleados: '👷 Empleados',
 };
 
+const claveLabel: Record<string, string> = {
+  nombre_completo: 'Nombre completo', telefono: 'Teléfono', direccion: 'Dirección',
+  empresa: 'Empresa', email: 'Email', rnc: 'RNC', notas: 'Notas',
+  descripcion_trabajo: 'Descripción', categoria: 'Categoría', estado: 'Estado',
+  fecha_inicio: 'Fecha inicio', fecha_entrega_estimada: 'Fecha entrega',
+  monto_final: 'Monto final', abono: 'Abono', tipo_trabajo: 'Tipo',
+  nombre_item: 'Artículo', stock_actual: 'Stock actual', stock_minimo: 'Stock mínimo',
+  costo_unitario: 'Costo unitario', unidad: 'Unidad', ubicacion: 'Ubicación',
+  tipo: 'Tipo', monto: 'Monto', detalle: 'Detalle', categoria_gasto: 'Categoría',
+  fecha: 'Fecha', metodo: 'Método', subtotal: 'Subtotal', itbis: 'ITBIS', total: 'Total',
+  numero_cotizacion: 'N° Cotización', nombre: 'Nombre', precio: 'Precio', stock: 'Stock',
+};
+
+const camposOcultos = ['id', 'created_at', 'updated_at', 'id_cliente', 'id_trabajo',
+  'id_empleado', 'foto_url', 'fotos_antes', 'fotos_despues', 'foto_muestra', 'foto_final',
+  'rnc_empresa', 'rnc_cliente', 'user_id'];
+
+function formatVal(val: any): string {
+  if (val === null || val === undefined || val === '') return '—';
+  if (typeof val === 'boolean') return val ? 'Sí' : 'No';
+  if (typeof val === 'number') return val.toLocaleString('es-DO');
+  if (typeof val === 'string' && val.match(/^\d{4}-\d{2}-\d{2}/)) return formatDate(val.slice(0,10));
+  return String(val);
+}
+
+function DatosLegibles({ datos, color }: { datos: any; color: string }) {
+  const parsed = typeof datos === 'string' ? (() => { try { return JSON.parse(datos); } catch { return {}; } })() : datos;
+  const entradas = Object.entries(parsed).filter(([k]) => !camposOcultos.includes(k) && parsed[k] !== null && parsed[k] !== undefined && parsed[k] !== '');
+  if (!entradas.length) return <p className="text-xs text-muted-foreground">Sin datos</p>;
+  return (
+    <div className="rounded-lg border overflow-hidden">
+      {entradas.map(([k, v], i) => (
+        <div key={k} className={`flex gap-2 px-3 py-2 text-xs ${i % 2 === 0 ? 'bg-secondary/30' : 'bg-background'}`}>
+          <span className="text-muted-foreground w-32 shrink-0">{claveLabel[k] || k}:</span>
+          <span className={`font-medium ${color}`}>{formatVal(v)}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function Auditoria() {
   const [registros,  setRegistros]  = useState<any[]>([]);
   const [search,     setSearch]     = useState('');
@@ -163,28 +204,14 @@ export default function Auditoria() {
 
               {detalle.datos_anteriores && (
                 <div>
-                  <p className="text-xs font-semibold text-orange-600 mb-1">📋 Datos anteriores:</p>
-                  <pre className="text-xs bg-secondary/50 p-3 rounded-lg overflow-x-auto whitespace-pre-wrap break-words">
-                    {JSON.stringify(
-                      typeof detalle.datos_anteriores === 'string'
-                        ? JSON.parse(detalle.datos_anteriores)
-                        : detalle.datos_anteriores,
-                      null, 2
-                    )}
-                  </pre>
+                  <p className="text-xs font-semibold text-orange-600 mb-2">📋 Datos anteriores:</p>
+                  <DatosLegibles datos={detalle.datos_anteriores} color="text-orange-700 dark:text-orange-400" />
                 </div>
               )}
               {detalle.datos_nuevos && (
                 <div>
-                  <p className="text-xs font-semibold text-green-600 mb-1">✅ Datos nuevos:</p>
-                  <pre className="text-xs bg-secondary/50 p-3 rounded-lg overflow-x-auto whitespace-pre-wrap break-words">
-                    {JSON.stringify(
-                      typeof detalle.datos_nuevos === 'string'
-                        ? JSON.parse(detalle.datos_nuevos)
-                        : detalle.datos_nuevos,
-                      null, 2
-                    )}
-                  </pre>
+                  <p className="text-xs font-semibold text-green-600 mb-2">✅ Datos nuevos:</p>
+                  <DatosLegibles datos={detalle.datos_nuevos} color="text-green-700 dark:text-green-400" />
                 </div>
               )}
             </div>
