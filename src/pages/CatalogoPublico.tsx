@@ -61,7 +61,7 @@ export default function CatalogoPublico() {
   };
 
   const abrirMapa = () => {
-    window.open(`https://maps.google.com/?q=${encodeURIComponent(direccion)}`, '_blank');
+    window.open('https://www.google.com/maps/place/Soluciones+Decorativas+Jose+Luis/@18.4686814,-69.9814906,662m/data=!3m1!1e3!4m15!1m8!3m7!1s0x8ea56197037973af:0xb2a1d724c1897254!2sSoluciones+Decorativas+Jose+Luis!8m2!3d18.4686814!4d-69.9814906!10e1!16s%2Fg%2F11fjyw2l5s!3m5!1s0x8ea56197037973af:0xb2a1d724c1897254!8m2!3d18.4686814!4d-69.9814906!16s%2Fg%2F11fjyw2l5s', '_blank');
   };
 
   return (
