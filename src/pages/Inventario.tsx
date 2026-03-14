@@ -30,11 +30,37 @@ const emptyMueble = { nombre: '', descripcion: '', precio: 0, stock: 1, disponib
 // ── Galería de trabajos ───────────────────────────────────────
 const emptyFotoGaleria = { titulo: '', descripcion: '', id_trabajo: '' };
 
+// ── Comprimir imagen (solo para inventario, no catálogo ni galería) ──
+async function comprimirImagen(file: File, maxWidth = 800, calidad = 0.7): Promise<File> {
+  return new Promise(resolve => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const scale  = Math.min(1, maxWidth / img.width);
+      const canvas = document.createElement('canvas');
+      canvas.width  = img.width  * scale;
+      canvas.height = img.height * scale;
+      canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height);
+      canvas.toBlob(blob => {
+        if (!blob) { resolve(file); return; }
+        resolve(new File([blob], file.name.replace(/\.\w+$/, '.jpg'), { type: 'image/jpeg' }));
+      }, 'image/jpeg', calidad);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); resolve(file); };
+    img.src = url;
+  });
+}
+
 // ── Subir imagen a un bucket ──────────────────────────────────
 async function subirImagen(bucket: string, file: File): Promise<string | null> {
-  const ext  = file.name.split('.').pop();
+  // Solo comprimir fotos de inventario (materia prima), no catálogo ni galería
+  const fileToUpload = bucket === 'inventario-fotos'
+    ? await comprimirImagen(file)
+    : file;
+  const ext  = bucket === 'inventario-fotos' ? 'jpg' : (file.name.split('.').pop() || 'jpg');
   const path = `${bucket}-${Date.now()}.${ext}`;
-  const { error } = await supabase.storage.from(bucket).upload(path, file, { upsert: true });
+  const { error } = await supabase.storage.from(bucket).upload(path, fileToUpload, { upsert: true });
   if (error) return null;
   return supabase.storage.from(bucket).getPublicUrl(path).data.publicUrl;
 }
