@@ -59,7 +59,11 @@ export default function Ofertas() {
 
   const enviar = async (oferta: any, cliente: any) => {
     const num = cliente.telefono.replace(/\D/g, '');
-    const msg = encodeURIComponent(oferta.mensaje);
+    // Incluir link de foto si existe
+    const fotoTexto = oferta.foto_url
+      ? `\n\n🖼️ Ver imagen de la oferta:\n${oferta.foto_url}`
+      : '';
+    const msg = encodeURIComponent(`${oferta.mensaje}${fotoTexto}`);
     window.open(`https://wa.me/1${num}?text=${msg}`, '_blank');
     await db.from('oferta_envios')
       .upsert({ id_oferta: oferta.id, id_cliente: cliente.id }, { onConflict: 'id_oferta,id_cliente' });
