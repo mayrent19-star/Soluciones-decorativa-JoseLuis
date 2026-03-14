@@ -64,7 +64,7 @@ export default function Ofertas() {
       ? `\n\n🖼️ Ver imagen de la oferta:\n${oferta.foto_url}`
       : '';
     const msg = encodeURIComponent(`${oferta.mensaje}${fotoTexto}`);
-    window.open(`https://wa.me/1${num}?text=${msg}`, '_blank');
+    window.open(`https://api.whatsapp.com/send?phone=1${num}&text=${msg}`, '_blank');
     await db.from('oferta_envios')
       .upsert({ id_oferta: oferta.id, id_cliente: cliente.id }, { onConflict: 'id_oferta,id_cliente' });
     setDetalles(prev => {
