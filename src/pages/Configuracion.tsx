@@ -134,34 +134,42 @@ export default function Configuracion() {
   // ── CREAR USUARIO ────────────────────────────────────────────
   const addUser = async () => {
     if (!newEmail || !newPass) { toast({ title: 'Email y contraseña requeridos', variant: 'destructive' }); return; }
+    if (newPass.length < 6) { toast({ title: 'La contraseña debe tener al menos 6 caracteres', variant: 'destructive' }); return; }
     try {
       const { data, error } = await supabase.auth.signUp({
         email: newEmail, password: newPass,
         options: { data: { nombre: newNombre } },
       });
       if (error) throw error;
-      if (data.user) {
-        // Asignar rol
-        await db.from('user_roles').insert({ user_id: data.user.id, role: newRole });
+      if (!data.user) throw new Error('No se pudo crear el usuario');
+      const uid = data.user.id;
 
-        // Solo insertar permisos si es empleado
-        if (newRole === 'employee') {
-          const rows = MODULOS.map(m => ({
-            user_id: data.user!.id,
-            modulo:  m.key,
-            activo:  newPermisos.has(m.key),
-          }));
-          await db.from('user_permisos').insert(rows);
-        }
-      }
-      toast({ title: '✅ Usuario creado' });
+      // 1. Asegurar perfil con nombre
+      await db.from('profiles').upsert(
+        { user_id: uid, email: newEmail, nombre: newNombre || '' },
+        { onConflict: 'user_id' }
+      );
+
+      // 2. Asignar rol (owner o employee)
+      await db.from('user_roles').insert({ user_id: uid, role: newRole });
+
+      // 3. Insertar TODOS los módulos siempre
+      //    owner → todos activos | employee → según checklist
+      const rows = MODULOS.map(m => ({
+        user_id: uid,
+        modulo:  m.key,
+        activo:  newRole === 'owner' ? true : newPermisos.has(m.key),
+      }));
+      await db.from('user_permisos').insert(rows);
+
+      toast({ title: `✅ ${newRole === 'owner' ? 'Propietario' : 'Empleado'} creado correctamente` });
       setRoleDialog(false);
-      setNewEmail(''); setNewPass(''); setNewNombre('');
+      setNewEmail(''); setNewPass(''); setNewNombre(''); setNewRole('employee');
       setNewPermisos(new Set(MODULOS.map(m => m.key)));
       setShowNewPermisos(false);
       loadUsers();
     } catch (err: any) {
-      toast({ title: err.message, variant: 'destructive' });
+      toast({ title: err.message || 'Error al crear usuario', variant: 'destructive' });
     }
   };
 
@@ -337,26 +345,21 @@ export default function Configuracion() {
                       <TableCell className="font-medium">{u.nombre || '—'}</TableCell>
                       <TableCell className="text-muted-foreground text-sm">{u.email}</TableCell>
                       <TableCell>
-                        <Badge variant={u.role === 'owner' ? 'default' : 'outline'}>
-                          {u.role === 'owner' ? 'Propietario' : 'Empleado'}
+                        <Badge variant={u.role === 'owner' ? 'default' : u.role === 'sin rol' ? 'destructive' : 'outline'}>
+                          {u.role === 'owner' ? '👑 Propietario' : u.role === 'sin rol' ? '⚠️ Sin rol' : '👤 Empleado'}
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        {u.role !== 'owner' && (
-                          <div className="flex gap-1">
-                            {/* Botón editar permisos */}
-                            <Button
-                              variant="ghost" size="icon"
-                              title="Editar accesos"
-                              onClick={() => openPermisos(u)}
-                            >
+                        <div className="flex gap-1">
+                          {u.role !== 'owner' && (
+                            <Button variant="ghost" size="icon" title="Editar accesos" onClick={() => openPermisos(u)}>
                               <Shield className="h-4 w-4 text-primary" />
                             </Button>
-                            <Button variant="ghost" size="icon" onClick={() => setDeleteUserId(u.user_id)}>
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
-                          </div>
-                        )}
+                          )}
+                          <Button variant="ghost" size="icon" onClick={() => setDeleteUserId(u.user_id)}>
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}

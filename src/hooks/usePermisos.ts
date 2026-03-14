@@ -4,6 +4,7 @@ import { useAuth } from '@/hooks/useAuth';
 
 // Lista completa de módulos del sistema
 export const MODULOS = [
+  { key: 'dashboard',    label: 'Dashboard',    path: '/dashboard' },
   { key: 'clientes',     label: 'Clientes',     path: '/clientes' },
   { key: 'trabajos',     label: 'Trabajos',     path: '/trabajos' },
   { key: 'cotizaciones', label: 'Cotizaciones', path: '/cotizaciones' },
@@ -15,6 +16,7 @@ export const MODULOS = [
   { key: 'reportes',     label: 'Reportes',     path: '/reportes' },
   { key: 'calendario',   label: 'Calendario',   path: '/calendario' },
   { key: 'ofertas',      label: 'Ofertas',      path: '/ofertas' },
+  { key: 'configuracion',label: 'Configuración',path: '/configuracion' },
 ] as const;
 
 export type ModuloKey = typeof MODULOS[number]['key'];
