@@ -316,13 +316,20 @@ export default function Inventario() {
 
         {/* ══════════════ CATÁLOGO MUEBLES ══════════════ */}
         <TabsContent value="muebles" className="mt-4 space-y-4">
-          {isOwner && (
-            <div className="flex justify-end">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            {/* Link público */}
+            <button
+              onClick={() => window.open('/catalogo-publico', '_blank')}
+              className="flex items-center gap-1.5 text-xs text-primary underline underline-offset-2 hover:opacity-70 transition-opacity"
+            >
+              🔗 Ver catálogo público (link para clientes)
+            </button>
+            {isOwner && (
               <Button onClick={() => { setMuebleForm(emptyMueble); setMuebleFotoFile(null); setMuebleFotoPreview(null); setMuebleDialog(true); }}>
                 <Plus className="h-4 w-4 mr-1" />Agregar Mueble
               </Button>
-            </div>
-          )}
+            )}
+          </div>
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input placeholder="Buscar mueble..." value={searchMueble} onChange={e => setSearchMueble(e.target.value)} className="pl-9" />
@@ -353,8 +360,11 @@ export default function Inventario() {
                   <p className="font-semibold text-sm truncate">{m.nombre}</p>
                   <div className="flex items-center justify-between mt-1">
                     <span className="text-xs font-bold text-primary">{m.precio ? formatCurrency(m.precio) : '—'}</span>
-                    <Badge variant={m.disponible ? 'default' : 'secondary'} className="text-xs">
-                      {m.disponible ? 'Disponible' : 'Vendido'}
+                    <Badge
+                      variant={m.stock > 0 && m.disponible ? 'default' : 'secondary'}
+                      className="text-xs"
+                    >
+                      {m.stock > 0 && m.disponible ? `${m.stock} disp.` : 'Agotado'}
                     </Badge>
                   </div>
                 </div>
@@ -651,14 +661,40 @@ export default function Inventario() {
               {muebleVer.foto_url && <img src={muebleVer.foto_url} alt={muebleVer.nombre} className="w-full rounded-lg object-cover max-h-64 border" />}
               <div className="grid grid-cols-2 gap-2 text-sm">
                 <div><span className="text-muted-foreground">Precio:</span> <span className="font-bold text-primary">{muebleVer.precio ? formatCurrency(muebleVer.precio) : '—'}</span></div>
-                <div><span className="text-muted-foreground">Stock:</span> <span className="font-semibold">{muebleVer.stock} unidad(es)</span></div>
+                <div>
+                  <span className="text-muted-foreground">Disponibles:</span>{' '}
+                  <span className={`font-semibold ${muebleVer.stock <= 0 || !muebleVer.disponible ? 'text-destructive' : 'text-green-600'}`}>
+                    {muebleVer.stock > 0 && muebleVer.disponible ? `${muebleVer.stock} unidad(es)` : 'Agotado'}
+                  </span>
+                </div>
                 <div className="col-span-2">
-                  <Badge variant={muebleVer.disponible ? 'default' : 'secondary'}>{muebleVer.disponible ? '✅ Disponible' : 'No disponible'}</Badge>
+                  <Badge variant={muebleVer.stock > 0 && muebleVer.disponible ? 'default' : 'secondary'}>
+                    {muebleVer.stock > 0 && muebleVer.disponible ? '✅ En stock' : '❌ Agotado'}
+                  </Badge>
                 </div>
                 {muebleVer.descripcion && <div className="col-span-2"><span className="text-muted-foreground">Descripción:</span><p className="font-medium mt-0.5">{muebleVer.descripcion}</p></div>}
               </div>
               {isOwner && (
                 <div className="flex gap-2 pt-2">
+                  {/* Botón vender 1 unidad */}
+                  {muebleVer.stock > 0 && muebleVer.disponible && (
+                    <Button
+                      variant="outline"
+                      className="flex-1 gap-1 border-orange-400 text-orange-600 hover:bg-orange-50"
+                      onClick={async () => {
+                        const nuevoStock = muebleVer.stock - 1;
+                        await db.from('catalogo_muebles').update({
+                          stock: nuevoStock,
+                          disponible: nuevoStock > 0,
+                        }).eq('id', muebleVer.id);
+                        reloadMuebles();
+                        setMuebleVer(null);
+                        toast({ title: `✅ Venta registrada — quedan ${nuevoStock} unidad(es)` });
+                      }}
+                    >
+                      Marcar 1 vendido
+                    </Button>
+                  )}
                   <Button variant="outline" className="flex-1" onClick={() => { openEditMueble(muebleVer); setMuebleVer(null); }}>
                     <Pencil className="h-4 w-4 mr-1" /> Editar
                   </Button>
