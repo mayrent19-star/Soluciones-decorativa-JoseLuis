@@ -35,6 +35,14 @@ const claveLabel: Record<string, string> = {
   numero_cotizacion: 'N° Cotización', nombre: 'Nombre', precio: 'Precio', stock: 'Stock',
 };
 
+const formatFechaHora = (isoStr: string) => {
+  if (!isoStr) return { fecha: '—', hora: '—' };
+  const date = new Date(isoStr);
+  const fecha = date.toLocaleDateString('es-DO', { timeZone: 'America/Santo_Domingo', day: '2-digit', month: '2-digit', year: 'numeric' });
+  const hora  = date.toLocaleTimeString('es-DO', { timeZone: 'America/Santo_Domingo', hour: '2-digit', minute: '2-digit', hour12: true });
+  return { fecha, hora };
+};
+
 const camposOcultos = ['id', 'created_at', 'updated_at', 'id_cliente', 'id_trabajo',
   'id_empleado', 'foto_url', 'fotos_antes', 'fotos_despues', 'foto_muestra', 'foto_final',
   'rnc_empresa', 'rnc_cliente', 'user_id'];
@@ -157,8 +165,8 @@ export default function Auditoria() {
             {filtered.map((r: any) => (
               <TableRow key={r.id} className="hover:bg-secondary/30">
                 <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
-                  <p>{formatDate(r.created_at?.slice(0,10))}</p>
-                  <p>{r.created_at?.slice(11,16)}</p>
+                  <p>{formatFechaHora(r.created_at).fecha}</p>
+                  <p>{formatFechaHora(r.created_at).hora}</p>
                 </TableCell>
                 <TableCell className="font-medium text-sm">{r.user_nombre || '—'}</TableCell>
                 <TableCell>
@@ -198,7 +206,7 @@ export default function Auditoria() {
                 <div><span className="text-muted-foreground">Usuario:</span> <span className="font-medium">{detalle.user_nombre}</span></div>
                 <div><span className="text-muted-foreground">Módulo:</span> <span className="font-medium">{moduloLabel[detalle.modulo] || detalle.modulo}</span></div>
                 <div><span className="text-muted-foreground">Acción:</span> <span className={`px-2 py-0.5 rounded-full font-medium capitalize ${accionColor[detalle.accion]}`}>{detalle.accion}</span></div>
-                <div><span className="text-muted-foreground">Fecha:</span> <span className="font-medium">{formatDate(detalle.created_at?.slice(0,10))} {detalle.created_at?.slice(11,16)}</span></div>
+                <div><span className="text-muted-foreground">Fecha:</span> <span className="font-medium">{formatFechaHora(detalle.created_at).fecha} {formatFechaHora(detalle.created_at).hora}</span></div>
               </div>
               <p className="text-muted-foreground text-xs border-l-2 border-primary pl-3">{detalle.descripcion}</p>
 
