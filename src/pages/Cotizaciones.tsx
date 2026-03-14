@@ -14,6 +14,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { fetchAll, insertRow, updateRow, deleteRow, getConfig } from '@/lib/supabase-service';
 import { supabase } from '@/integrations/supabase/client';
 import { formatCurrency, formatDate } from '@/utils/helpers';
+import { registrarAuditoria } from '@/hooks/useAuditoria';
 
 const estadosBadge: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
   'Pendiente': 'outline', 'Aprobada': 'secondary', 'Cancelada': 'destructive',
@@ -81,6 +82,12 @@ export default function Cotizaciones() {
         await supabase.from('cotizacion_items').insert({ id_cotizacion: cot.id, ...item });
     }
     load(); setDialogOpen(false);
+    await registrarAuditoria({
+      modulo: 'cotizaciones',
+      accion: form.id ? 'editar' : 'crear',
+      descripcion: `${form.id ? 'Editó' : 'Creó'} cotización para cliente ID: ${form.id_cliente}`,
+      datos_nuevos: { ...form, subtotal, itbis, total },
+    });
     toast({ title: 'Cotización guardada' });
   };
 
@@ -148,7 +155,17 @@ export default function Cotizaciones() {
   };
 
   const handleDelete = async () => {
-    if (deleteId) { await deleteRow('cotizaciones', deleteId); load(); setDeleteId(null); toast({ title: 'Cotización eliminada' }); }
+    if (deleteId) {
+      const cot = items.find(i => i.id === deleteId);
+      await deleteRow('cotizaciones', deleteId);
+      await registrarAuditoria({
+        modulo: 'cotizaciones',
+        accion: 'eliminar',
+        descripcion: `Eliminó cotización: ${cot?.numero_cotizacion || deleteId}`,
+        datos_anteriores: cot,
+      });
+      load(); setDeleteId(null); toast({ title: 'Cotización eliminada' });
+    }
   };
 
   const viewDetail = async (cot: any) => {

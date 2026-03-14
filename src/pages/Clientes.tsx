@@ -12,6 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { formatDate, formatCurrency } from '@/utils/helpers';
+import { registrarAuditoria } from '@/hooks/useAuditoria';
 
 const db = supabase as any;
 const empty = { nombre_completo: '', telefono: '', direccion: '', empresa: '', email: '', rnc: '', notas: '' };
@@ -66,6 +67,8 @@ export default function Clientes() {
     if (!form.nombre_completo || !form.telefono) {
       toast({ title: 'Completa los campos requeridos', variant: 'destructive' }); return;
     }
+    const esEdicion = !!form.id;
+    const anterior  = esEdicion ? items.find(i => i.id === form.id) : null;
     let clienteId = form.id;
     if (form.id) {
       await db.from('clientes').update(form).eq('id', form.id);
@@ -81,13 +84,27 @@ export default function Clientes() {
         );
       }
     }
+    await registrarAuditoria({
+      modulo: 'clientes',
+      accion: esEdicion ? 'editar' : 'crear',
+      descripcion: `${esEdicion ? 'Editó' : 'Creó'} cliente: ${form.nombre_completo}`,
+      datos_anteriores: anterior,
+      datos_nuevos: form,
+    });
     reload(); setDialogOpen(false); setForm(empty); setFormEtiquetas([]);
     toast({ title: form.id ? '✅ Cliente actualizado' : '✅ Cliente creado' });
   };
 
   const handleDelete = async () => {
     if (deleteId) {
+      const cliente = items.find(i => i.id === deleteId);
       await db.from('clientes').delete().eq('id', deleteId);
+      await registrarAuditoria({
+        modulo: 'clientes',
+        accion: 'eliminar',
+        descripcion: `Eliminó cliente: ${cliente?.nombre_completo || deleteId}`,
+        datos_anteriores: cliente,
+      });
       reload(); setDeleteId(null);
       toast({ title: 'Cliente eliminado' });
     }

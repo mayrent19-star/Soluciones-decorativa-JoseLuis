@@ -12,6 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { formatCurrency, formatDate } from '@/utils/helpers';
+import { registrarAuditoria } from '@/hooks/useAuditoria';
 
 const db = supabase as any;
 const emptyMov = { tipo: 'Entrada', fecha: new Date().toISOString().slice(0, 10), monto: 0, detalle: '', categoria_gasto: '', metodo_pago: 'Efectivo', cuenta_detalle: '', id_trabajo: null, id_empleado: null };
@@ -76,6 +77,12 @@ export default function CajaChica() {
       id_empleado: form.id_empleado || null,
     });
     if (error) { toast({ title: 'Error al guardar', variant: 'destructive' }); return; }
+    await registrarAuditoria({
+      modulo: 'caja',
+      accion: 'crear',
+      descripcion: `Registró ${form.tipo}: ${form.detalle} — RD$${form.monto}`,
+      datos_nuevos: form,
+    });
     reload(); setDialogOpen(false);
     setForm(emptyMov);
     toast({ title: `✅ ${form.tipo} registrada` });

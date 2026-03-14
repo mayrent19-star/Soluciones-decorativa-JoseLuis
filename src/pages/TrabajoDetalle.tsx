@@ -15,6 +15,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { fetchById, fetchAll, fetchWhere, insertRow, updateRow, deleteRow, getConfig } from '@/lib/supabase-service';
 import { formatDate, formatCurrency } from '@/utils/helpers';
 import { supabase } from '@/integrations/supabase/client';
+import { registrarAuditoria } from '@/hooks/useAuditoria';
 
 const db = supabase as any;
 const metodosPago = ['Efectivo', 'Transferencia', 'Tarjeta'];
@@ -44,8 +45,6 @@ export default function TrabajoDetalle() {
   const [asigDialog, setAsigDialog] = useState(false);
   const [matDialog,  setMatDialog]  = useState(false);
   const [pagoDialog, setPagoDialog] = useState(false);
-  const [ncfActivo, setNcfActivo]   = useState(false);
-  const [ncfNumero, setNcfNumero]   = useState('');
   const [asigForm, setAsigForm] = useState<any>({});
   const [matForm,  setMatForm]  = useState<any>({ id_item: '', cantidad: 1, costo_unitario: 0 });
   const [pagoForm, setPagoForm] = useState<any>({
@@ -115,8 +114,13 @@ export default function TrabajoDetalle() {
       fecha:  pagoForm.fecha,
       notas:  pagoForm.notas || null,
     });
-    // Actualizar abono total en trabajos
     await updateRow('trabajos', id!, { abono: totalPagos + monto });
+    await registrarAuditoria({
+      modulo: 'trabajos',
+      accion: 'editar',
+      descripcion: `Registró pago de ${formatCurrency(monto)} (${pagoForm.metodo}) en trabajo: ${trabajo?.descripcion_trabajo || id}`,
+      datos_nuevos: { monto, metodo: pagoForm.metodo, fecha: pagoForm.fecha },
+    });
     reload();
     setPagoDialog(false);
     setPagoForm({ monto: '', metodo: 'Efectivo', fecha: new Date().toISOString().slice(0, 10), notas: '' });
@@ -126,53 +130,28 @@ export default function TrabajoDetalle() {
   const deletePago = async (pagoId: string, monto: number) => {
     await db.from('trabajo_pagos').delete().eq('id', pagoId);
     await updateRow('trabajos', id!, { abono: Math.max(0, totalPagos - monto) });
+    await registrarAuditoria({
+      modulo: 'trabajos',
+      accion: 'eliminar',
+      descripcion: `Eliminó pago de ${formatCurrency(monto)} en trabajo: ${trabajo?.descripcion_trabajo || id}`,
+      datos_anteriores: { pagoId, monto },
+    });
     reload();
     toast({ title: 'Pago eliminado' });
   };
 
   const generateInvoice = async () => {
-    const [garantia, rnc, nombre, telefono, email, direccion] = await Promise.all([
-      getConfig('garantia_texto'),
-      getConfig('empresa_rnc'),
-      getConfig('empresa_nombre'),
-      getConfig('empresa_telefono'),
-      getConfig('empresa_email'),
-      getConfig('empresa_direccion'),
-    ]);
-    const esFiscal   = ncfActivo && ncfNumero.trim() !== '';
-    const tituloDoc  = esFiscal ? 'FACTURA FISCAL' : 'FACTURA';
-    const colorTitulo = esFiscal ? '#185FA5' : '#EF5709';
-    const estadoPago = pendiente <= 0
-      ? `<tr class="total pagado"><td><strong>PAGO TOTAL</strong></td><td class="text-right" style="color:#16a34a"><strong>${formatCurrency(totalPagos)}</strong></td></tr>`
-      : `<tr class="total"><td><strong>PENDIENTE</strong></td><td class="text-right"><strong>${formatCurrency(pendiente)}</strong></td></tr>`;
-
+    const garantia = await getConfig('garantia_texto');
+    const rnc = await getConfig('empresa_rnc');
     const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Factura</title>
-    <style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Segoe UI',sans-serif;padding:40px;max-width:800px;margin:auto;color:#1a1a1a}.header{display:flex;justify-content:space-between;border-bottom:3px solid #185FA5;padding-bottom:20px;margin-bottom:30px}.brand{display:flex;align-items:center;gap:14px}.brand img{width:70px;height:70px;object-fit:contain;border-radius:8px}.brand-info h1{color:#185FA5;font-size:16px}.brand-info p{font-size:11px;color:#666}.inv-info{text-align:right}.inv-info h2{color:${colorTitulo};font-size:26px}.inv-info p{font-size:12px;color:#666}.ncf-badge{display:inline-block;margin-top:6px;padding:3px 10px;background:#185FA5;color:white;border-radius:4px;font-size:11px;font-weight:700;letter-spacing:1px}.section{margin-bottom:20px}.section-title{font-size:12px;font-weight:700;color:#185FA5;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;border-bottom:1px solid #eee;padding-bottom:4px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:6px 20px}.field label{font-size:10px;color:#888}.field p{font-size:13px;font-weight:500}table.items{width:100%;border-collapse:collapse;margin:10px 0}table.items th{background:#185FA5;color:white;padding:8px 12px;font-size:11px}table.items td{padding:8px 12px;font-size:12px;border-bottom:1px solid #eee}.text-right{text-align:right}.totals{display:flex;justify-content:flex-end;margin-top:16px}.totals-table tr td{padding:4px 12px;font-size:12px}.totals-table .total td{font-weight:700;font-size:15px;border-top:2px solid #185FA5;color:#185FA5}.totals-table .pagado td{color:#16a34a !important}.warranty{margin-top:24px;padding:12px;background:#f8f8f8;border-radius:6px;font-size:11px;color:#666;border-left:3px solid #185FA5}.footer{margin-top:30px;text-align:center;font-size:10px;color:#999;border-top:1px solid #eee;padding-top:12px}</style></head><body>
-    <div class="header">
-      <div class="brand">
-        <img src="${window.location.origin}/icons/icon-128.png"/>
-        <div class="brand-info">
-          <h1>${nombre || 'Soluciones Decorativas José Luis'}</h1>
-          <p>Tapicería &amp; Ebanistería</p>
-          <p>RNC: ${rnc || ''}</p>
-          ${telefono ? `<p>Tel: ${telefono}</p>` : ''}
-          ${email ? `<p>${email}</p>` : ''}
-          ${direccion ? `<p>${direccion}</p>` : ''}
-        </div>
-      </div>
-      <div class="inv-info">
-        <h2>${tituloDoc}</h2>
-        ${esFiscal ? `<div class="ncf-badge">NCF: ${ncfNumero.trim()}</div>` : ''}
-        <p>Fecha: ${formatDate(new Date().toISOString().slice(0,10))}</p>
-        <p>OT: ${trabajo.id.slice(0,8).toUpperCase()}</p>
-      </div>
-    </div>
+    <style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Segoe UI',sans-serif;padding:40px;max-width:800px;margin:auto;color:#1a1a1a}.header{display:flex;justify-content:space-between;border-bottom:3px solid #185FA5;padding-bottom:20px;margin-bottom:30px}.brand{display:flex;align-items:center;gap:14px}.brand img{width:70px;height:70px;object-fit:contain;border-radius:8px}.brand-info h1{color:#185FA5;font-size:16px}.brand-info p{font-size:11px;color:#666}.inv-info{text-align:right}.inv-info h2{color:#EF5709;font-size:26px}.inv-info p{font-size:12px;color:#666}.section{margin-bottom:20px}.section-title{font-size:12px;font-weight:700;color:#185FA5;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;border-bottom:1px solid #eee;padding-bottom:4px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:6px 20px}.field label{font-size:10px;color:#888}.field p{font-size:13px;font-weight:500}table.items{width:100%;border-collapse:collapse;margin:10px 0}table.items th{background:#185FA5;color:white;padding:8px 12px;font-size:11px}table.items td{padding:8px 12px;font-size:12px;border-bottom:1px solid #eee}.text-right{text-align:right}.totals{display:flex;justify-content:flex-end;margin-top:16px}.totals-table tr td{padding:4px 12px;font-size:12px}.totals-table .total td{font-weight:700;font-size:15px;border-top:2px solid #185FA5;color:#185FA5}.warranty{margin-top:24px;padding:12px;background:#f8f8f8;border-radius:6px;font-size:11px;color:#666;border-left:3px solid #185FA5}.footer{margin-top:30px;text-align:center;font-size:10px;color:#999;border-top:1px solid #eee;padding-top:12px}</style></head><body>
+    <div class="header"><div class="brand"><img src="${window.location.origin}/icons/icon-128.png"/><div class="brand-info"><h1>Soluciones Decorativas José Luis</h1><p>Tapicería & Ebanistería</p><p>RNC: ${rnc}</p></div></div><div class="inv-info"><h2>FACTURA</h2><p>Fecha: ${formatDate(new Date().toISOString().slice(0,10))}</p><p>OT: ${trabajo.id.slice(0,8).toUpperCase()}</p></div></div>
     <div class="section"><div class="section-title">Cliente</div><div class="grid"><div class="field"><label>Nombre</label><p>${cliente?.nombre_completo||''}</p></div><div class="field"><label>Teléfono</label><p>${cliente?.telefono||''}</p></div><div class="field"><label>Dirección</label><p>${cliente?.direccion||''}</p></div><div class="field"><label>RNC</label><p>${cliente?.rnc||'—'}</p></div></div></div>
     <div class="section"><div class="section-title">Trabajo</div><div class="grid"><div class="field"><label>Descripción</label><p>${trabajo.descripcion_trabajo}</p></div><div class="field"><label>Categoría</label><p>${trabajo.categoria}</p></div><div class="field"><label>Estado</label><p>${trabajo.estado}</p></div><div class="field"><label>Inicio</label><p>${formatDate(trabajo.fecha_inicio)}</p></div></div></div>
     <div class="section"><div class="section-title">Pagos realizados</div><table class="items"><thead><tr><th>Fecha</th><th>Método</th><th class="text-right">Monto</th><th>Notas</th></tr></thead><tbody>${pagos.map((p: any) => `<tr><td>${formatDate(p.fecha)}</td><td>${p.metodo}</td><td class="text-right">${formatCurrency(p.monto)}</td><td>${p.notas||'—'}</td></tr>`).join('')}</tbody></table></div>
-    <div class="totals"><table class="totals-table"><tr><td>Monto total</td><td class="text-right">${formatCurrency(montoTotal)}</td></tr><tr><td>Total pagado</td><td class="text-right">${formatCurrency(totalPagos)}</td></tr>${estadoPago}</table></div>
+    <div class="totals"><table class="totals-table"><tr><td>Monto total</td><td class="text-right">${formatCurrency(montoTotal)}</td></tr><tr><td>Total pagado</td><td class="text-right">${formatCurrency(totalPagos)}</td></tr><tr class="total"><td><strong>PENDIENTE</strong></td><td class="text-right"><strong>${formatCurrency(pendiente)}</strong></td></tr></table></div>
     ${garantia ? `<div class="warranty"><strong>Garantía:</strong> ${garantia}</div>` : ''}
-    <div class="footer">${nombre || 'Soluciones Decorativas José Luis'} — Tapicería &amp; Ebanistería</div>
+    <div class="footer">Soluciones Decorativas José Luis — Tapicería & Ebanistería</div>
     </body></html>`;
     const w = window.open('', '_blank', 'width=900,height=700');
     if (w) { w.document.write(html); w.document.close(); setTimeout(() => w.print(), 500); }
@@ -187,35 +166,11 @@ export default function TrabajoDetalle() {
           <p className="text-sm text-muted-foreground">{cliente?.nombre_completo}</p>
         </div>
         {isOwner && (
-          <div className="flex gap-2 shrink-0 flex-wrap justify-end">
+          <div className="flex gap-2 shrink-0">
             {trabajo.estado !== 'Finalizado' && trabajo.estado !== 'Entregado' && trabajo.estado !== 'Cancelado' && (
               <Button size="sm" variant="outline" onClick={marcarFinalizado}>Finalizar</Button>
             )}
-            {/* Panel NCF inline */}
-            <div className="flex items-center gap-2 flex-wrap justify-end">
-              <div className="flex items-center gap-1.5">
-                <input
-                  type="checkbox"
-                  id="ncf-toggle"
-                  checked={ncfActivo}
-                  onChange={e => { setNcfActivo(e.target.checked); if (!e.target.checked) setNcfNumero(''); }}
-                  className="h-4 w-4 rounded border-gray-300 cursor-pointer"
-                />
-                <label htmlFor="ncf-toggle" className="text-xs cursor-pointer select-none whitespace-nowrap">Factura Fiscal</label>
-              </div>
-              {ncfActivo && (
-                <input
-                  type="text"
-                  placeholder="NCF: B0100000001"
-                  value={ncfNumero}
-                  onChange={e => setNcfNumero(e.target.value)}
-                  className="h-8 text-xs px-2 rounded-md border border-input bg-background w-40 focus:outline-none focus:ring-1 focus:ring-ring"
-                />
-              )}
-              <Button size="sm" variant="outline" onClick={generateInvoice}>
-                {ncfActivo && ncfNumero.trim() ? '🧾 Factura Fiscal' : 'Factura'}
-              </Button>
-            </div>
+            <Button size="sm" variant="outline" onClick={generateInvoice}>Factura</Button>
           </div>
         )}
       </div>

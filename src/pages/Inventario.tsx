@@ -15,6 +15,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { fetchAll, insertRow, updateRow, deleteRow } from '@/lib/supabase-service';
 import { formatCurrency, formatDate } from '@/utils/helpers';
+import { registrarAuditoria } from '@/hooks/useAuditoria';
 
 const db = supabase as any;
 
@@ -151,6 +152,12 @@ export default function Inventario() {
     else          await insertRow('inventario', data);
     reload(); setDialogOpen(false); setForm(emptyItem);
     setFotoFile(null); setFotoPreview(null);
+    await registrarAuditoria({
+      modulo: 'inventario',
+      accion: form.id ? 'editar' : 'crear',
+      descripcion: `${form.id ? 'Editó' : 'Creó'} artículo: ${form.nombre_item}`,
+      datos_nuevos: form,
+    });
     toast({ title: form.id ? 'Artículo actualizado' : 'Artículo creado' });
   };
 

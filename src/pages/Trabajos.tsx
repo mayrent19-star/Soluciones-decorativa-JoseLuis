@@ -19,6 +19,7 @@ import { fetchAll, insertRow, updateRow, deleteRow } from '@/lib/supabase-servic
 import { formatCurrency } from '@/utils/helpers';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
+import { registrarAuditoria } from '@/hooks/useAuditoria';
 
 // ── Calendario ──────────────────────────────────────────────
 const db = supabase as any;
@@ -188,10 +189,19 @@ export default function Trabajos() {
     if (montoTotal !== null && montoTotal < 0) { toast({ title: 'El monto no puede ser negativo', variant: 'destructive' }); return; }
     if (abono !== null && montoTotal !== null && abono > montoTotal) { toast({ title: 'El abono no puede ser mayor al monto', variant: 'destructive' }); return; }
     setSaving(true);
+    const esEdicion = !!form.id;
+    const anterior  = esEdicion ? items.find(i => i.id === form.id) : null;
     try {
       const payload = { ...form, monto_final: montoTotal, abono };
       if (form.id) await updateRow('trabajos', form.id, payload);
       else await insertRow('trabajos', payload);
+      await registrarAuditoria({
+        modulo: 'trabajos',
+        accion: esEdicion ? 'editar' : 'crear',
+        descripcion: `${esEdicion ? 'Editó' : 'Creó'} trabajo: ${form.descripcion_trabajo}`,
+        datos_anteriores: anterior,
+        datos_nuevos: payload,
+      });
       await reload(); setDialogOpen(false); setForm({ ...empty });
       toast({ title: form.id ? 'Trabajo actualizado' : 'Trabajo creado' });
     } catch (e: any) {
@@ -200,7 +210,17 @@ export default function Trabajos() {
   };
 
   const handleDelete = async () => {
-    if (deleteId) { await deleteRow('trabajos', deleteId); reload(); setDeleteId(null); toast({ title: 'Trabajo eliminado' }); }
+    if (deleteId) {
+      const trabajo = items.find(i => i.id === deleteId);
+      await deleteRow('trabajos', deleteId);
+      await registrarAuditoria({
+        modulo: 'trabajos',
+        accion: 'eliminar',
+        descripcion: `Eliminó trabajo: ${trabajo?.descripcion_trabajo || deleteId}`,
+        datos_anteriores: trabajo,
+      });
+      reload(); setDeleteId(null); toast({ title: 'Trabajo eliminado' });
+    }
   };
 
   const onUploadAntes = async (files: FileList | null) => {

@@ -22,6 +22,7 @@ const allNavItems = [
   { path: '/reportes',      label: 'Reportes',      icon: FileBarChart,    ownerOnly: true,  modulo: 'reportes' },
   { path: '/calendario',    label: 'Calendario',    icon: Calendar,        ownerOnly: false, modulo: 'calendario' },
   { path: '/ofertas',       label: 'Ofertas',       icon: Megaphone,       ownerOnly: true,  modulo: 'ofertas' },
+  { path: '/auditoria',     label: 'Auditoría',     icon: Shield,          ownerOnly: true,  modulo: null },
   { path: '/configuracion', label: 'Configuración', icon: Settings,        ownerOnly: true,  modulo: null },
 ];
 
