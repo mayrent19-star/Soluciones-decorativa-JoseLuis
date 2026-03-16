@@ -20,8 +20,9 @@ import { registrarAuditoria } from '@/hooks/useAuditoria';
 const db = supabase as any;
 
 // ── Materia prima ──────────────────────────────────────────────
-const categorias = ['Tela', 'Madera', 'Espuma', 'Pegamento', 'Herramienta', 'Acabado', 'Otro'];
-const unidades   = ['unidad', 'yarda', 'metro', 'pie', 'galón', 'plancha', 'caja', 'rollo'];
+const categorias  = ['Tela', 'Madera', 'Espuma', 'Pegamento', 'Herramienta', 'Acabado', 'Otro'];
+const ubicaciones = ['Almacén Casa', 'Local Mercede', 'Local Calle 8', 'Telas', 'Almacén Taller'];
+const unidades    = ['unidad', 'yarda', 'metro', 'pie', 'galón', 'plancha', 'caja', 'rollo'];
 const emptyItem  = { nombre_item: '', categoria: 'Tela', unidad: 'unidad', stock_actual: null as number | null, stock_minimo: null as number | null, costo_unitario: 0, ubicacion: '' };
 const emptyMov   = { id_item: '', tipo_movimiento: 'Entrada', cantidad: 0, motivo: '', fecha: new Date().toISOString().slice(0, 10), id_trabajo: null };
 
@@ -75,6 +76,9 @@ export default function Inventario() {
   const [movs, setMovs]       = useState<any[]>([]);
   const [trabajos, setTrabajos] = useState<any[]>([]);
   const [search, setSearch]   = useState('');
+  const [filtroCategoria, setFiltroCategoria] = useState('todas');
+  const [filtroUbicacion, setFiltroUbicacion] = useState('todas');
+  const [hojaImpresion, setHojaImpresion]     = useState<any>(null); // movimiento + item para imprimir
   const [dialogOpen, setDialogOpen] = useState(false);
   const [form, setForm]       = useState<any>(emptyItem);
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -135,10 +139,13 @@ export default function Inventario() {
   // ════════════════════════════════════════════════
   // MATERIA PRIMA
   // ════════════════════════════════════════════════
-  const filtered = items.filter((i: any) =>
-    i.nombre_item?.toLowerCase().includes(search.toLowerCase()) ||
-    i.categoria?.toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = items.filter((i: any) => {
+    const ms = i.nombre_item?.toLowerCase().includes(search.toLowerCase()) ||
+               i.categoria?.toLowerCase().includes(search.toLowerCase());
+    const mc = filtroCategoria === 'todas' || i.categoria === filtroCategoria;
+    const mu = filtroUbicacion === 'todas' || i.ubicacion === filtroUbicacion;
+    return ms && mc && mu;
+  });
 
   const subirFotoItem = async (): Promise<string | null> => fotoFile ? subirImagen('inventario-fotos', fotoFile) : null;
 
@@ -193,6 +200,20 @@ export default function Inventario() {
       id_trabajo:       movForm.id_trabajo || null,
     };
     await insertRow('inventario_movimientos', movData);
+    // Si es salida, preparar hoja de impresión
+    if (movForm.tipo_movimiento === 'Salida') {
+      const trabajo = trabajos.find((t: any) => t.id === movForm.id_trabajo);
+      setHojaImpresion({
+        numero:    `SAL-${Date.now().toString().slice(-4)}`,
+        fecha:     movForm.fecha,
+        item:      item.nombre_item,
+        unidad:    item.unidad,
+        ubicacion: item.ubicacion || 'Sin ubicación',
+        cantidad,
+        motivo:    movForm.motivo || '—',
+        trabajo:   trabajo?.descripcion_trabajo || null,
+      });
+    }
     reload(); setMovDialog(false); setMovForm(emptyMov); setMovSearch('');
     toast({ title: `${movForm.tipo_movimiento} registrada` });
   };
@@ -291,9 +312,41 @@ export default function Inventario() {
               <Button onClick={() => { setForm(emptyItem); setFotoFile(null); setFotoPreview(null); setDialogOpen(true); }}><Plus className="h-4 w-4 mr-1" />Nuevo</Button>
             </div>
           )}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input placeholder="Buscar artículo o categoría..." value={search} onChange={e => setSearch(e.target.value)} className="pl-9" />
+          <div className="flex flex-col gap-2">
+            {/* Fila 1: buscador + contador */}
+            <div className="flex gap-2 items-center">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input placeholder="Buscar artículo..." value={search} onChange={e => setSearch(e.target.value)} className="pl-9" />
+              </div>
+              <div className="shrink-0 text-xs text-muted-foreground bg-secondary px-3 py-2 rounded-lg border">
+                <span className="font-semibold text-foreground">{filtered.length}</span>
+                {filtered.length !== items.length && <span> / {items.length}</span>} artículos
+              </div>
+            </div>
+            {/* Fila 2: filtros */}
+            <div className="flex gap-2 flex-wrap">
+              <Select value={filtroCategoria} onValueChange={setFiltroCategoria}>
+                <SelectTrigger className="h-8 text-xs w-auto min-w-[130px]"><SelectValue placeholder="Categoría" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todas">Todas las categorías</SelectItem>
+                  {categorias.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <Select value={filtroUbicacion} onValueChange={setFiltroUbicacion}>
+                <SelectTrigger className="h-8 text-xs w-auto min-w-[150px]"><SelectValue placeholder="Ubicación" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todas">Todas las ubicaciones</SelectItem>
+                  {ubicaciones.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              {(filtroCategoria !== 'todas' || filtroUbicacion !== 'todas' || search) && (
+                <button onClick={() => { setFiltroCategoria('todas'); setFiltroUbicacion('todas'); setSearch(''); }}
+                  className="h-8 px-3 text-xs border rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors">
+                  Limpiar filtros
+                </button>
+              )}
+            </div>
           </div>
           <div className="border rounded-lg overflow-x-auto bg-card">
             <Table>
@@ -544,7 +597,12 @@ export default function Inventario() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-1.5"><Label className="text-xs">Costo Unit.</Label><Input type="number" value={form.costo_unitario || ''} onChange={e => setForm({ ...form, costo_unitario: +e.target.value || 0 })} /></div>
-              <div className="grid gap-1.5"><Label className="text-xs">Ubicación</Label><Input value={form.ubicacion || ''} onChange={e => setForm({ ...form, ubicacion: e.target.value })} /></div>
+              <div className="grid gap-1.5"><Label className="text-xs">Ubicación</Label>
+                <Select value={form.ubicacion || ''} onValueChange={v => setForm({ ...form, ubicacion: v })}>
+                  <SelectTrigger><SelectValue placeholder="Seleccionar" /></SelectTrigger>
+                  <SelectContent>{ubicaciones.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
             </div>
             <div className="grid gap-1.5">
               <Label className="text-xs">Foto (opcional)</Label>
@@ -809,6 +867,98 @@ export default function Inventario() {
                 </div>
               )}
               <p className="text-xs text-muted-foreground">{formatDate(galeriaVer.created_at)}</p>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* ════════ HOJA DE SALIDA IMPRIMIBLE ════════ */}
+      <Dialog open={!!hojaImpresion} onOpenChange={() => setHojaImpresion(null)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader><DialogTitle>🖨️ Hoja de Salida de Inventario</DialogTitle></DialogHeader>
+          {hojaImpresion && (
+            <div className="space-y-4">
+              <div id="hoja-salida" className="border rounded-lg p-5 space-y-4 bg-white text-black text-sm">
+                {/* Encabezado */}
+                <div className="flex justify-between items-start border-b-2 border-blue-600 pb-3">
+                  <div>
+                    <p className="text-xs text-gray-500">Soluciones Decorativas José Luis</p>
+                    <p className="text-base font-bold">Hoja de Salida de Inventario</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs text-gray-500">N° de salida</p>
+                    <p className="font-bold text-blue-700">{hojaImpresion.numero}</p>
+                    <p className="text-xs text-gray-500">{formatDate(hojaImpresion.fecha)}</p>
+                  </div>
+                </div>
+                {/* Info */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="bg-gray-50 rounded-lg p-3">
+                    <p className="text-xs text-gray-500">Ubicación de origen</p>
+                    <p className="font-semibold">{hojaImpresion.ubicacion}</p>
+                  </div>
+                  <div className="bg-gray-50 rounded-lg p-3">
+                    <p className="text-xs text-gray-500">Trabajo / Motivo</p>
+                    <p className="font-semibold">{hojaImpresion.trabajo || hojaImpresion.motivo}</p>
+                  </div>
+                </div>
+                {/* Tabla material */}
+                <table className="w-full text-sm border-collapse">
+                  <thead>
+                    <tr className="bg-blue-600 text-white">
+                      <th className="p-2 text-left rounded-tl">Material</th>
+                      <th className="p-2 text-center">Unidad</th>
+                      <th className="p-2 text-center rounded-tr">Cantidad</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr className="border-b">
+                      <td className="p-2">{hojaImpresion.item}</td>
+                      <td className="p-2 text-center text-gray-500">{hojaImpresion.unidad}</td>
+                      <td className="p-2 text-center font-bold">{hojaImpresion.cantidad}</td>
+                    </tr>
+                  </tbody>
+                </table>
+                {/* Firmas */}
+                <div>
+                  <p className="text-xs text-gray-400 uppercase tracking-wide mb-3">Firmas de conformidad</p>
+                  <div className="grid grid-cols-3 gap-4">
+                    {[['Autorizado por', 'Gerencia'], ['Entregado por', 'Encargado almacén'], ['Recibido por', 'Empleado / Taller']].map(([titulo, sub]) => (
+                      <div key={titulo} className="text-center">
+                        <div className="h-12 border-b border-black mb-2" />
+                        <p className="text-xs font-semibold">{titulo}</p>
+                        <p className="text-xs text-gray-400">{sub}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                {/* Footer */}
+                <div className="border-t pt-2 flex justify-between text-xs text-gray-400">
+                  <span>Guardar en caja de: {hojaImpresion.ubicacion}</span>
+                  <span>Soluciones Decorativas JL</span>
+                </div>
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setHojaImpresion(null)}>Cerrar</Button>
+                <Button onClick={() => {
+                  const el = document.getElementById('hoja-salida');
+                  if (!el) return;
+                  const w = window.open('', '_blank');
+                  if (!w) return;
+                  w.document.write(`<html><head><title>Hoja de Salida</title>
+                    <style>body{font-family:Arial,sans-serif;padding:24px;font-size:13px;}
+                    table{width:100%;border-collapse:collapse;}
+                    th{background:#185FA5;color:white;padding:8px;}
+                    td{padding:8px;border-bottom:1px solid #eee;}
+                    .firma{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;text-align:center;}
+                    .linea{height:48px;border-bottom:1px solid black;margin-bottom:8px;}
+                    </style></head><body>${el.innerHTML}</body></html>`);
+                  w.document.close();
+                  w.print();
+                }}>
+                  🖨️ Imprimir
+                </Button>
+              </div>
             </div>
           )}
         </DialogContent>
