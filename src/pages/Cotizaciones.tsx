@@ -15,6 +15,7 @@ import { fetchAll, insertRow, updateRow, deleteRow, getConfig } from '@/lib/supa
 import { supabase } from '@/integrations/supabase/client';
 import { formatCurrency, formatDate } from '@/utils/helpers';
 import { registrarAuditoria } from '@/hooks/useAuditoria';
+import ClienteSelector from '@/components/ClienteSelector';
 
 const estadosBadge: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
   'Pendiente': 'outline', 'Aprobada': 'secondary', 'Cancelada': 'destructive',
@@ -37,6 +38,8 @@ export default function Cotizaciones() {
   });
   const [cotItems, setCotItems] = useState<any[]>([{ descripcion: '', cantidad: 1, precio_unitario: 0 }]);
   const [aplicarItbis, setAplicarItbis] = useState(false);
+  const [clienteLibreNombre, setClienteLibreNombre] = useState('');
+  const [clienteLibreRnc,    setClienteLibreRnc]    = useState('');
 
   // Abono al aprobar
   const [abonoMonto, setAbonoMonto]   = useState<string>('');
@@ -65,12 +68,26 @@ export default function Cotizaciones() {
   const updateItem = (idx: number, key: string, val: any) => setCotItems(cotItems.map((item, i) => i === idx ? { ...item, [key]: val } : item));
 
   const handleSave = async () => {
-    if (!form.id_cliente) { toast({ title: 'Selecciona un cliente', variant: 'destructive' }); return; }
+    const tieneCliente = !!form.id_cliente;
+    const tieneClienteLibre = !tieneCliente && !!clienteLibreNombre.trim();
+    if (!tieneCliente && !tieneClienteLibre) {
+      toast({ title: 'Selecciona un cliente o ingresa un nombre', variant: 'destructive' }); return;
+    }
     const [rncEmpresa, rncCliente] = await Promise.all([
       getConfig('empresa_rnc'),
-      supabase.from('clientes').select('rnc').eq('id', form.id_cliente).maybeSingle().then(r => r.data?.rnc || '')
+      tieneCliente
+        ? supabase.from('clientes').select('rnc').eq('id', form.id_cliente).maybeSingle().then(r => r.data?.rnc || '')
+        : Promise.resolve(clienteLibreRnc || ''),
     ]);
-    const cotData = { ...form, subtotal, itbis, total, rnc_empresa: rncEmpresa, rnc_cliente: rncCliente };
+    const cotData = {
+      ...form,
+      // Si no hay id_cliente usar null y guardar nombre en notas si no tiene
+      id_cliente: form.id_cliente || null,
+      cliente_nombre_libre: tieneClienteLibre ? clienteLibreNombre.trim() : null,
+      subtotal, itbis, total,
+      rnc_empresa: rncEmpresa,
+      rnc_cliente: rncCliente,
+    };
     if (form.id) {
       await updateRow('cotizaciones', form.id, cotData);
       await supabase.from('cotizacion_items').delete().eq('id_cotizacion', form.id);
@@ -151,6 +168,8 @@ export default function Cotizaciones() {
     setForm({ id_cliente: '', estado: 'Pendiente', fecha: new Date().toISOString().slice(0, 10), notas: '' });
     setCotItems([{ descripcion: '', cantidad: 1, precio_unitario: 0 }]);
     setAplicarItbis(false);
+    setClienteLibreNombre('');
+    setClienteLibreRnc('');
     setDialogOpen(true);
   };
 
@@ -249,13 +268,15 @@ export default function Cotizaciones() {
           <DialogHeader><DialogTitle>{form.id ? 'Editar' : 'Nueva'} Cotización</DialogTitle></DialogHeader>
           <div className="grid gap-4 py-2">
             <div className="grid sm:grid-cols-2 gap-4">
-              <div className="grid gap-1.5">
-                <Label className="text-xs">Cliente *</Label>
-                <Select value={form.id_cliente || ''} onValueChange={v => setForm({ ...form, id_cliente: v })}>
-                  <SelectTrigger><SelectValue placeholder="Seleccionar" /></SelectTrigger>
-                  <SelectContent>{clientes.map((c: any) => <SelectItem key={c.id} value={c.id}>{c.nombre_completo}</SelectItem>)}</SelectContent>
-                </Select>
-              </div>
+              <ClienteSelector
+                clientes={clientes}
+                value={form.id_cliente || ''}
+                onChange={v => setForm({ ...form, id_cliente: v })}
+                nombreLibre={clienteLibreNombre}
+                rncLibre={clienteLibreRnc}
+                onNombreLibre={setClienteLibreNombre}
+                onRncLibre={setClienteLibreRnc}
+              />
               <div className="grid gap-1.5">
                 <Label className="text-xs">Fecha</Label>
                 <Input type="date" value={form.fecha} onChange={e => setForm({ ...form, fecha: e.target.value })} />

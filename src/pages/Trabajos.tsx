@@ -20,6 +20,7 @@ import { formatCurrency } from '@/utils/helpers';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { registrarAuditoria } from '@/hooks/useAuditoria';
+import ClienteSelector from '@/components/ClienteSelector';
 
 // ── Calendario ──────────────────────────────────────────────
 const db = supabase as any;
@@ -401,10 +402,10 @@ export default function Trabajos() {
                   <h3 className="text-sm font-semibold text-muted-foreground">Pendientes de {MESES[calMes]}</h3>
                   {isOwner && <Button size="sm" variant="outline" className="gap-1 text-xs" onClick={() => { setEvForm({ ...emptyEvento, fecha: hoyStr }); setEvDialog(true); }}><Plus className="h-3.5 w-3.5" />Evento</Button>}
                 </div>
-                {todo.map((item, idx) => (
+                {todo.map((item: any, idx) => (
                   <div key={idx} className="flex items-center gap-3 p-3 rounded-lg bg-card border hover:bg-secondary/30 transition-colors cursor-pointer"
                     onClick={() => item.tipo === 'trabajo' ? window.location.href = `/trabajos/${item.id}` : setDiaVer(item.fecha)}>
-                    <div className="w-1.5 h-8 rounded-full shrink-0" style={{ backgroundColor: item.tipo === 'trabajo' ? colorEstado[item.estado!] : colorEvento[item.tipoEvento!] || '#5F5E5A' }} />
+                    <div className="w-1.5 h-8 rounded-full shrink-0" style={{ backgroundColor: item.tipo === 'trabajo' ? colorEstado[item.estado] : colorEvento[item.tipoEvento] || '#5F5E5A' }} />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium truncate">{item.titulo}</p>
                       <p className="text-xs text-muted-foreground">{item.fecha}{item.sub ? ` · ${item.sub}` : ''}</p>
@@ -424,13 +425,11 @@ export default function Trabajos() {
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>{form.id ? 'Editar' : 'Nuevo'} Trabajo</DialogTitle></DialogHeader>
           <div className="grid gap-4 py-2">
-            <div className="grid gap-1.5">
-              <Label className="text-xs">Cliente *</Label>
-              <Select value={form.id_cliente || ''} onValueChange={v => setForm({ ...form, id_cliente: v })}>
-                <SelectTrigger><SelectValue placeholder="Seleccionar" /></SelectTrigger>
-                <SelectContent>{clientes.map((c: any) => <SelectItem key={c.id} value={c.id}>{c.nombre_completo}</SelectItem>)}</SelectContent>
-              </Select>
-            </div>
+            <ClienteSelector
+                clientes={clientes}
+                value={form.id_cliente || ''}
+                onChange={v => setForm({ ...form, id_cliente: v })}
+              />
             <div className="grid gap-1.5">
               <Label className="text-xs">Descripción *</Label>
               <Textarea value={form.descripcion_trabajo || ''} onChange={e => setForm({ ...form, descripcion_trabajo: e.target.value })} rows={2} />
