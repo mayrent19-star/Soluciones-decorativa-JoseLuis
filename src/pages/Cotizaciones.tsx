@@ -105,11 +105,14 @@ export default function Cotizaciones() {
       for (const item of cotItems.filter(i => i.descripcion))
         await supabase.from('cotizacion_items').insert({ id_cotizacion: cot.id, ...item });
     }
+    const nombreAud = form.id_cliente
+      ? clientes.find((c: any) => c.id === form.id_cliente)?.nombre_completo || form.id_cliente
+      : `${clienteLibreNombre.trim()} (sin registrar)`;
     load(); setDialogOpen(false);
     await registrarAuditoria({
       modulo: 'cotizaciones',
       accion: form.id ? 'editar' : 'crear',
-      descripcion: `${form.id ? 'Editó' : 'Creó'} cotización para cliente ID: ${form.id_cliente}`,
+      descripcion: `${form.id ? 'Editó' : 'Creó'} cotización para: ${nombreAud}`,
       datos_nuevos: { ...form, subtotal, itbis, total },
     });
     toast({ title: 'Cotización guardada' });
@@ -121,14 +124,28 @@ export default function Cotizaciones() {
     const abono = parseFloat(abonoMonto);
     const abonoVal = !isNaN(abono) && abono > 0 ? abono : null;
 
-    // 1. Actualizar estado cotización (solo el estado, abono vive en trabajos)
+    // Si es cliente sin registrar — avisar antes de continuar
+    if (!cot.id_cliente && cot.cliente_nombre_libre) {
+      const confirmar = window.confirm(
+        `Esta cotización es para "${cot.cliente_nombre_libre}" que no está registrado.\n\nEl trabajo se creará sin cliente asignado.\n\nSe recomienda registrarlo en Clientes para darle seguimiento.\n\n¿Deseas continuar?`
+      );
+      if (!confirmar) return;
+    }
+
+    // 1. Actualizar estado cotización
     await updateRow('cotizaciones', cot.id, { estado: 'Aprobada' });
 
-    // 2. Crear trabajo automáticamente
+    // 2. Construir descripción: nombre del cliente + ítems cotizados
     const cl = clientes.find((c: any) => c.id === cot.id_cliente);
+    const nombreCl = cl?.nombre_completo || cot.cliente_nombre_libre || '';
+    const { data: citems } = await db.from('cotizacion_items').select('descripcion').eq('id_cotizacion', cot.id);
+    const itemsDesc = (citems || []).map((i: any) => i.descripcion).filter(Boolean).join(', ');
+    const descripcionTrabajo = [nombreCl, itemsDesc].filter(Boolean).join(' — ');
+
+    // 3. Crear trabajo automáticamente
     const trabajoData: any = {
-      id_cliente:           cot.id_cliente,
-      descripcion_trabajo:  cot.notas || `Trabajo cotizado — ${cl?.nombre_completo || ''}`,
+      id_cliente:           cot.id_cliente || null,
+      descripcion_trabajo:  descripcionTrabajo || `Cotización ${cot.numero_cotizacion}`,
       categoria:            'Tapicería',
       estado:               'En proceso',
       fecha_inicio:         new Date().toISOString().slice(0, 10),
