@@ -36,10 +36,6 @@ export default function Dashboard() {
   const balanceHoy = ingresosHoy - gastosHoy;
   const enProceso = trabajos.filter((t: any) => t.estado === 'En proceso' || t.estado === 'Pendiente').length;
 
-  const handleRegistrarInicio = async () => {
-    if (!montoInicial || montoInicial <= 0) { return; }
-  };
-
   const estadoData = [
     { name: 'Pendiente', value: trabajos.filter((t: any) => t.estado === 'Pendiente').length },
     { name: 'En proceso', value: trabajos.filter((t: any) => t.estado === 'En proceso').length },
