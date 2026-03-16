@@ -53,10 +53,17 @@ export default function Cotizaciones() {
   };
   useEffect(() => { load(); }, []);
 
+  const nombreCliente = (cot: any) => {
+    if (cot.id_cliente) return clientes.find((c: any) => c.id === cot.id_cliente)?.nombre_completo || '—';
+    if (cot.cliente_nombre_libre) return cot.cliente_nombre_libre;
+    return '—';
+  };
+
   const filtered = items.filter(i => {
     const cl = clientes.find((c: any) => c.id === i.id_cliente);
     return i.numero_cotizacion?.toLowerCase().includes(search.toLowerCase()) ||
-      cl?.nombre_completo?.toLowerCase().includes(search.toLowerCase());
+      cl?.nombre_completo?.toLowerCase().includes(search.toLowerCase()) ||
+      i.cliente_nombre_libre?.toLowerCase().includes(search.toLowerCase());
   });
 
   const subtotal = cotItems.reduce((s: number, i: any) => s + (i.cantidad * i.precio_unitario), 0);
@@ -196,6 +203,9 @@ export default function Cotizaciones() {
   const generatePDF = async (cot: any) => {
     const { data: citems } = await supabase.from('cotizacion_items').select('*').eq('id_cotizacion', cot.id);
     const cl = clientes.find((c: any) => c.id === cot.id_cliente);
+    const nombrePDF  = cl?.nombre_completo || cot.cliente_nombre_libre || '';
+    const telefonoPDF = cl?.telefono || '';
+    const direccionPDF = cl?.direccion || '';
     const [garantia, empNombre, empRnc, empTelefono, empEmail, empDireccion] = await Promise.all([
       getConfig('garantia_texto'),
       getConfig('empresa_nombre'),
@@ -207,7 +217,7 @@ export default function Cotizaciones() {
     const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Cotización ${cot.numero_cotizacion}</title>
     <style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Segoe UI',sans-serif;padding:40px;max-width:800px;margin:auto;color:#1a1a1a}.header{display:flex;justify-content:space-between;border-bottom:3px solid #185FA5;padding-bottom:20px;margin-bottom:30px}.brand{display:flex;align-items:center;gap:14px}.brand img{width:70px;height:70px;object-fit:contain;border-radius:8px}.brand-info h1{color:#185FA5;font-size:16px}.brand-info p{font-size:11px;color:#666}.inv-info{text-align:right}.inv-info h2{color:#185FA5;font-size:24px}.inv-info p{font-size:12px;color:#666}.section{margin-bottom:20px}.section-title{font-size:12px;font-weight:700;color:#185FA5;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;border-bottom:1px solid #eee;padding-bottom:4px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:6px 20px}.field label{font-size:10px;color:#888}.field p{font-size:13px;font-weight:500}table.items{width:100%;border-collapse:collapse;margin:10px 0}table.items th{background:#185FA5;color:white;padding:8px 12px;font-size:11px;text-align:left}table.items td{padding:8px 12px;font-size:12px;border-bottom:1px solid #eee}.text-right{text-align:right}.totals{display:flex;justify-content:flex-end;margin-top:12px}.totals-table tr td{padding:4px 12px;font-size:12px}.totals-table .total td{font-weight:700;font-size:15px;border-top:2px solid #185FA5;color:#185FA5}.warranty{margin-top:30px;padding:12px;background:#f8f8f8;border-radius:6px;font-size:11px;color:#666;border-left:3px solid #185FA5}.footer{margin-top:30px;text-align:center;font-size:10px;color:#999;border-top:1px solid #eee;padding-top:12px}</style></head><body>
     <div class="header"><div class="brand"><img src="${window.location.origin}/icons/logo.png" onerror="this.src='${window.location.origin}/icons/icon-128.png'" /><div class="brand-info"><h1>${empNombre || 'Soluciones Decorativas José Luis'}</h1><p>Tapicería &amp; Ebanistería</p><p>RNC: ${empRnc || cot.rnc_empresa || ''}</p>${empTelefono ? `<p>Tel: ${empTelefono}</p>` : ''}${empEmail ? `<p>${empEmail}</p>` : ''}${empDireccion ? `<p>${empDireccion}</p>` : ''}</div></div><div class="inv-info"><h2>COTIZACIÓN</h2><p>${cot.numero_cotizacion}</p><p>Fecha: ${formatDate(cot.fecha)}</p>${cot.fecha_vencimiento ? `<p>Válida hasta: ${formatDate(cot.fecha_vencimiento)}</p>` : ''}</div></div>
-    <div class="section"><div class="section-title">Cliente</div><div class="grid"><div class="field"><label>Nombre</label><p>${cl?.nombre_completo || ''}</p></div><div class="field"><label>RNC</label><p>${cot.rnc_cliente || '—'}</p></div><div class="field"><label>Teléfono</label><p>${cl?.telefono || ''}</p></div><div class="field"><label>Dirección</label><p>${cl?.direccion || ''}</p></div></div></div>
+    <div class="section"><div class="section-title">Cliente</div><div class="grid"><div class="field"><label>Nombre</label><p>${nombrePDF}</p></div><div class="field"><label>RNC</label><p>${cot.rnc_cliente || cot.cliente_rnc_libre || '—'}</p></div><div class="field"><label>Teléfono</label><p>${telefonoPDF}</p></div><div class="field"><label>Dirección</label><p>${direccionPDF}</p></div></div></div>
     <div class="section"><div class="section-title">Detalle</div><table class="items"><thead><tr><th>Descripción</th><th class="text-right">Cant.</th><th class="text-right">P. Unit.</th><th class="text-right">Total</th></tr></thead><tbody>${(citems || []).map((i: any) => `<tr><td>${i.descripcion}</td><td class="text-right">${i.cantidad}</td><td class="text-right">${formatCurrency(i.precio_unitario)}</td><td class="text-right">${formatCurrency(i.cantidad * i.precio_unitario)}</td></tr>`).join('')}</tbody></table></div>
     <div class="totals"><table class="totals-table"><tr><td>Subtotal</td><td class="text-right">${formatCurrency(cot.subtotal)}</td></tr>${cot.itbis > 0 ? `<tr><td>ITBIS 18%</td><td class="text-right">${formatCurrency(cot.itbis)}</td></tr>` : ''}<tr class="total"><td><strong>TOTAL</strong></td><td class="text-right"><strong>${formatCurrency(cot.total)}</strong></td></tr></table></div>
     ${garantia ? `<div class="warranty"><strong>Garantía:</strong> ${garantia}</div>` : ''}
@@ -245,7 +255,12 @@ export default function Cotizaciones() {
             {filtered.map((c: any) => (
               <TableRow key={c.id}>
                 <TableCell className="font-medium text-sm">{c.numero_cotizacion}</TableCell>
-                <TableCell className="text-sm">{clientes.find((cl: any) => cl.id === c.id_cliente)?.nombre_completo || '—'}</TableCell>
+                <TableCell className="text-sm">
+                  <span>{nombreCliente(c)}</span>
+                  {!c.id_cliente && c.cliente_nombre_libre && (
+                    <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 font-medium">sin registrar</span>
+                  )}
+                </TableCell>
                 <TableCell><Badge variant={estadosBadge[c.estado] || 'outline'}>{c.estado}</Badge></TableCell>
                 <TableCell className="hidden sm:table-cell text-muted-foreground text-sm">{formatDate(c.fecha)}</TableCell>
                 <TableCell className="hidden md:table-cell text-right">{formatCurrency(c.total)}</TableCell>
