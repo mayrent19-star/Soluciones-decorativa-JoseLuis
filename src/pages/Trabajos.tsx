@@ -28,7 +28,7 @@ const DIAS  = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 const tiposEvento = ['Reunión','Llamada','Entrega','Compra','Pago','Otro'];
 const colorEstado: Record<string, string> = {
-  'En proceso': '#185FA5', 'Finalizado': '#1D9E75',
+  'Sin iniciar': '#94A3B8', 'En proceso': '#185FA5', 'Finalizado': '#1D9E75',
   'Entregado': '#3B6D11', 'Cancelado': '#A32D2D',
 };
 const colorEvento: Record<string, string> = {
@@ -37,11 +37,11 @@ const colorEvento: Record<string, string> = {
 };
 const emptyEvento = { titulo: '', tipo: 'Reunión', fecha: '', hora: '', descripcion: '' };
 
-const categorias = ['Tapicería', 'Ebanistería', 'Mixto'];
+const categorias = ['Tapicería', 'Ebanistería', 'Mixto', 'Pintura', 'Costura'];
 
 // Estados de trabajo — quitamos Pendiente (viene de cotización)
 // Flujo: En proceso → Finalizado → Entregado
-const estados = ['En proceso', 'Finalizado', 'Entregado', 'Cancelado'];
+const estados = ['Sin iniciar', 'En proceso', 'Finalizado', 'Entregado', 'Cancelado'];
 
 // Siguiente estado en el flujo rápido
 const siguienteEstado: Record<string, string | null> = {
@@ -54,12 +54,13 @@ const siguienteEstado: Record<string, string | null> = {
 const tipos = ['Reparación', 'Fabricación'] as const;
 
 const estadoBadgeVariant: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
-  'En proceso': 'default', 'Finalizado': 'secondary',
+  'Sin iniciar': 'outline', 'En proceso': 'default', 'Finalizado': 'secondary',
   'Entregado': 'secondary', 'Cancelado': 'destructive',
 };
 
 // Colores visuales del badge para feedback rápido
 const estadoColor: Record<string, string> = {
+  'Sin iniciar': 'bg-slate-100 text-slate-600 dark:bg-slate-800/30 dark:text-slate-400',
   'En proceso': 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
   'Finalizado':  'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
   'Entregado':   'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300',
