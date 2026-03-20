@@ -132,6 +132,8 @@ export default function Reportes() {
   const [hasta, setHasta] = useState('');
   const [empId, setEmpId] = useState('todos');
   const [estadoFilter, setEstadoFilter] = useState('todos');
+  const [ubicacionFilter, setUbicacionFilter] = useState('todas');
+  const ubicaciones = ['Almacén Casa', 'Local Mercede', 'Local Calle 8', 'Telas', 'Almacén Taller'];
 
   const [empleados,    setEmpleados]    = useState<any[]>([]);
   const [asignaciones, setAsignaciones] = useState<any[]>([]);
@@ -304,6 +306,7 @@ export default function Reportes() {
           <TabsTrigger value="empleados" className="gap-1"><TrendingUp className="h-3.5 w-3.5"/>Empleados</TabsTrigger>
           <TabsTrigger value="caja"      className="gap-1"><Wallet    className="h-3.5 w-3.5" />Caja</TabsTrigger>
           <TabsTrigger value="inventario" className="gap-1"><Package  className="h-3.5 w-3.5" />Inventario</TabsTrigger>
+          <TabsTrigger value="almacen" className="gap-1"><Package className="h-3.5 w-3.5" />Por Almacén</TabsTrigger>
         </TabsList>
 
         {/* ══ TRABAJOS ══ */}
@@ -498,6 +501,136 @@ export default function Reportes() {
                 </TableBody>
               </Table>
             </div>
+          </CardContent></Card>
+        </TabsContent>
+
+        {/* ══ POR ALMACÉN ══ */}
+        <TabsContent value="almacen" className="mt-4">
+          <Card><CardContent className="p-5 space-y-4">
+            <div className="grid gap-1.5">
+              <Label className="text-xs font-medium">Seleccionar Almacén / Ubicación</Label>
+              <Select value={ubicacionFilter} onValueChange={setUbicacionFilter}>
+                <SelectTrigger><SelectValue placeholder="Seleccionar ubicación" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todas">Todas las ubicaciones</SelectItem>
+                  {ubicaciones.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {(() => {
+              const itemsUbic = ubicacionFilter === 'todas'
+                ? inventario
+                : inventario.filter((i: any) => i.ubicacion === ubicacionFilter);
+              const movUbic = movInv.filter((m: any) =>
+                itemsUbic.some((i: any) => i.id === m.id_item) &&
+                m.tipo_movimiento === 'Salida'
+              );
+
+              const imprimirHoja = () => {
+                const filas = itemsUbic.map((i: any) => `
+                  <tr style="border-bottom:1px solid #eee">
+                    <td style="padding:8px 12px">${i.nombre_item}</td>
+                    <td style="padding:8px 12px;text-align:center">${i.categoria}</td>
+                    <td style="padding:8px 12px;text-align:center">${i.unidad}</td>
+                    <td style="padding:8px 12px;text-align:center;font-weight:bold">${i.stock_actual ?? 0}</td>
+                  </tr>`).join('');
+                const html = `<!DOCTYPE html><html><head><meta charset="UTF-8">
+                  <title>Inventario ${ubicacionFilter}</title>
+                  <style>body{font-family:Arial,sans-serif;padding:32px;max-width:800px;margin:auto}
+                  h1{color:#185FA5;font-size:18px}h2{color:#64748B;font-size:13px;font-weight:normal}
+                  table{width:100%;border-collapse:collapse}
+                  th{background:#185FA5;color:white;padding:8px 12px;text-align:left;font-size:12px}
+                  td{font-size:12px}.footer{margin-top:24px;font-size:11px;color:#94A3B8;border-top:1px solid #eee;padding-top:12px;display:flex;justify-content:space-between}
+                  .firma{margin-top:40px;display:grid;grid-template-columns:1fr 1fr;gap:32px}
+                  .linea{border-bottom:1px solid #000;height:40px;margin-bottom:6px}p{font-size:11px;color:#64748B;margin:0}
+                  </style></head><body>
+                  <h1>Inventario — ${ubicacionFilter === 'todas' ? 'Todas las Ubicaciones' : ubicacionFilter}</h1>
+                  <h2>Soluciones Decorativas José Luis &nbsp;|&nbsp; Fecha: ${new Date().toLocaleDateString('es-DO')}</h2>
+                  <table><thead><tr><th>Artículo</th><th>Categoría</th><th>Unidad</th><th>Stock Actual</th></tr></thead>
+                  <tbody>${filas}</tbody></table>
+                  <div class="firma">
+                    <div><div class="linea"></div><p>Encargado de almacén</p></div>
+                    <div><div class="linea"></div><p>Gerencia</p></div>
+                  </div>
+                  <div class="footer"><span>Total artículos: ${itemsUbic.length}</span><span>Imprimir y plastificar — Soluciones Decorativas JL</span></div>
+                  </body></html>`;
+                const w = window.open('', '_blank');
+                if (w) { w.document.write(html); w.document.close(); setTimeout(() => w.print(), 400); }
+              };
+
+              return (
+                <>
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <div className="text-sm text-muted-foreground">
+                      <span className="font-semibold text-foreground text-base">{itemsUbic.length}</span> artículos
+                      {ubicacionFilter !== 'todas' && ` en ${ubicacionFilter}`}
+                    </div>
+                    <Button size="sm" variant="outline" className="gap-2" onClick={imprimirHoja}>
+                      🖨️ Imprimir hoja de almacén
+                    </Button>
+                  </div>
+
+                  {/* Stock por ubicación */}
+                  <div className="border rounded-lg overflow-x-auto">
+                    <Table>
+                      <TableHeader><TableRow>
+                        <TableHead>Artículo</TableHead>
+                        <TableHead className="hidden sm:table-cell">Categoría</TableHead>
+                        <TableHead className="hidden sm:table-cell">Ubicación</TableHead>
+                        <TableHead className="text-center">Stock</TableHead>
+                        <TableHead className="hidden sm:table-cell text-center">Mín.</TableHead>
+                      </TableRow></TableHeader>
+                      <TableBody>
+                        {itemsUbic.length === 0 && <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-6">Sin artículos</TableCell></TableRow>}
+                        {itemsUbic.map((i: any) => (
+                          <TableRow key={i.id}>
+                            <TableCell className="font-medium">{i.nombre_item}</TableCell>
+                            <TableCell className="hidden sm:table-cell text-muted-foreground text-sm">{i.categoria}</TableCell>
+                            <TableCell className="hidden sm:table-cell text-muted-foreground text-sm">{i.ubicacion || '—'}</TableCell>
+                            <TableCell className="text-center">
+                              <Badge variant={i.stock_actual <= i.stock_minimo ? 'destructive' : 'secondary'}>
+                                {i.stock_actual ?? 0} {i.unidad}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="hidden sm:table-cell text-center text-muted-foreground">{i.stock_minimo ?? 0}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+
+                  {/* Salidas de ese almacén */}
+                  {movUbic.length > 0 && (
+                    <>
+                      <p className="text-sm font-semibold text-muted-foreground pt-2">Salidas registradas</p>
+                      <div className="border rounded-lg overflow-x-auto">
+                        <Table>
+                          <TableHeader><TableRow>
+                            <TableHead>Artículo</TableHead>
+                            <TableHead className="text-right">Cant.</TableHead>
+                            <TableHead className="hidden sm:table-cell">Asignado a</TableHead>
+                            <TableHead className="hidden sm:table-cell">Motivo</TableHead>
+                            <TableHead>Fecha</TableHead>
+                          </TableRow></TableHeader>
+                          <TableBody>
+                            {movUbic.map((m: any) => (
+                              <TableRow key={m.id}>
+                                <TableCell className="font-medium">{inventario.find((i: any) => i.id === m.id_item)?.nombre_item || '—'}</TableCell>
+                                <TableCell className="text-right text-destructive font-medium">-{m.cantidad}</TableCell>
+                                <TableCell className="hidden sm:table-cell text-muted-foreground text-sm">{m.asignado_a || '—'}</TableCell>
+                                <TableCell className="hidden sm:table-cell text-muted-foreground text-sm">{m.motivo || '—'}</TableCell>
+                                <TableCell className="text-sm">{formatDate(m.fecha)}</TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </>
+                  )}
+                </>
+              );
+            })()}
           </CardContent></Card>
         </TabsContent>
 

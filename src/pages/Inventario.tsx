@@ -24,7 +24,7 @@ const categorias  = ['Tela', 'Madera', 'Espuma', 'Pegamento', 'Herramienta', 'Ac
 const ubicaciones = ['Almacén Casa', 'Local Mercede', 'Local Calle 8', 'Telas', 'Almacén Taller'];
 const unidades    = ['unidad', 'yarda', 'metro', 'pie', 'galón', 'plancha', 'caja', 'rollo'];
 const emptyItem  = { nombre_item: '', categoria: 'Tela', unidad: 'unidad', stock_actual: null as number | null, stock_minimo: null as number | null, costo_unitario: 0, ubicacion: '' };
-const emptyMov   = { id_item: '', tipo_movimiento: 'Entrada', cantidad: 0, motivo: '', fecha: new Date().toISOString().slice(0, 10), id_trabajo: null };
+const emptyMov   = { id_item: '', tipo_movimiento: 'Entrada', cantidad: 0, motivo: '', fecha: new Date().toISOString().slice(0, 10), id_trabajo: null, asignado_a: '' };
 
 // ── Muebles / Productos terminados ────────────────────────────
 const emptyMueble = { nombre: '', descripcion: '', precio: 0, stock: 1, disponible: true };
@@ -198,6 +198,7 @@ export default function Inventario() {
       motivo:           movForm.motivo || null,
       fecha:            movForm.fecha,
       id_trabajo:       movForm.id_trabajo || null,
+      asignado_a:       movForm.asignado_a || null,
     };
     await insertRow('inventario_movimientos', movData);
     // Si es salida, preparar hoja de impresión
@@ -212,6 +213,7 @@ export default function Inventario() {
         cantidad,
         motivo:    movForm.motivo || '—',
         trabajo:   trabajo?.descripcion_trabajo || null,
+        asignado_a: movForm.asignado_a || '—',
       });
     }
     reload(); setMovDialog(false); setMovForm(emptyMov); setMovSearch('');
@@ -651,6 +653,9 @@ export default function Inventario() {
               <div className="grid gap-1.5"><Label className="text-xs">Fecha</Label><Input type="date" value={movForm.fecha} onChange={e => setMovForm({ ...movForm, fecha: e.target.value })} /></div>
             </div>
             <div className="grid gap-1.5"><Label className="text-xs">Motivo</Label><Input value={movForm.motivo || ''} onChange={e => setMovForm({ ...movForm, motivo: e.target.value })} /></div>
+            {movForm.tipo_movimiento === 'Salida' && (
+              <div className="grid gap-1.5"><Label className="text-xs">Asignado a (quién va a buscar) *</Label><Input placeholder="Ej: Carlos, Pedro..." value={movForm.asignado_a || ''} onChange={e => setMovForm({ ...movForm, asignado_a: e.target.value })} /></div>
+            )}
             <div className="grid gap-1.5"><Label className="text-xs">Trabajo (opcional)</Label>
               <Select value={movForm.id_trabajo || 'ninguno'} onValueChange={v => setMovForm({ ...movForm, id_trabajo: v === 'ninguno' ? null : v })}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
@@ -900,6 +905,10 @@ export default function Inventario() {
                   <div className="bg-gray-50 rounded-lg p-3">
                     <p className="text-xs text-gray-500">Trabajo / Motivo</p>
                     <p className="font-semibold">{hojaImpresion.trabajo || hojaImpresion.motivo}</p>
+                  </div>
+                  <div className="bg-gray-50 rounded-lg p-3 col-span-2">
+                    <p className="text-xs text-gray-500">Asignado a</p>
+                    <p className="font-semibold">{hojaImpresion.asignado_a || '—'}</p>
                   </div>
                 </div>
                 {/* Tabla material */}
