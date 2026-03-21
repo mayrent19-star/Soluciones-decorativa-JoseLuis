@@ -594,11 +594,11 @@ export default function Inventario() {
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
-              <div className="grid gap-1.5"><Label className="text-xs">Stock Actual</Label><Input type="number" placeholder="0" value={form.stock_actual ?? ''} onChange={e => setForm({ ...form, stock_actual: e.target.value === '' ? null : +e.target.value })} /></div>
-              <div className="grid gap-1.5"><Label className="text-xs">Stock Mínimo</Label><Input type="number" placeholder="0" value={form.stock_minimo ?? ''} onChange={e => setForm({ ...form, stock_minimo: e.target.value === '' ? null : +e.target.value })} /></div>
+              <div className="grid gap-1.5"><Label className="text-xs">Stock Actual</Label><Input type="text" inputMode="numeric" placeholder="0" value={form.stock_actual ?? ''} onChange={e => { const v = e.target.value.replace(/[^0-9]/g,''); setForm({ ...form, stock_actual: v === '' ? null : parseInt(v) }); }} /></div>
+              <div className="grid gap-1.5"><Label className="text-xs">Stock Mínimo</Label><Input type="text" inputMode="numeric" placeholder="0" value={form.stock_minimo ?? ''} onChange={e => { const v = e.target.value.replace(/[^0-9]/g,''); setForm({ ...form, stock_minimo: v === '' ? null : parseInt(v) }); }} /></div>
             </div>
             <div className="grid grid-cols-2 gap-4">
-              <div className="grid gap-1.5"><Label className="text-xs">Costo Unit.</Label><Input type="number" value={form.costo_unitario || ''} onChange={e => setForm({ ...form, costo_unitario: +e.target.value || 0 })} /></div>
+              <div className="grid gap-1.5"><Label className="text-xs">Costo Unit.</Label><Input type="text" inputMode="decimal" value={form.costo_unitario === 0 ? '' : form.costo_unitario} onChange={e => { const v = e.target.value.replace(/[^0-9.]/g,''); setForm({ ...form, costo_unitario: v === '' ? 0 : parseFloat(v) || 0 }); }} placeholder="0" /></div>
               <div className="grid gap-1.5"><Label className="text-xs">Ubicación</Label>
                 <Select value={form.ubicacion || ''} onValueChange={v => setForm({ ...form, ubicacion: v })}>
                   <SelectTrigger><SelectValue placeholder="Seleccionar" /></SelectTrigger>
@@ -649,7 +649,7 @@ export default function Inventario() {
               </Select>
             </div>
             <div className="grid grid-cols-2 gap-4">
-              <div className="grid gap-1.5"><Label className="text-xs">Cantidad *</Label><Input type="number" value={movForm.cantidad || ''} onChange={e => setMovForm({ ...movForm, cantidad: +e.target.value })} /></div>
+              <div className="grid gap-1.5"><Label className="text-xs">Cantidad *</Label><Input type="text" inputMode="numeric" value={movForm.cantidad === 0 ? '' : movForm.cantidad} onChange={e => { const v = e.target.value.replace(/[^0-9]/g,''); setMovForm({ ...movForm, cantidad: v === '' ? 0 : parseInt(v) || 0 }); }} placeholder="0" /></div>
               <div className="grid gap-1.5"><Label className="text-xs">Fecha</Label><Input type="date" value={movForm.fecha} onChange={e => setMovForm({ ...movForm, fecha: e.target.value })} /></div>
             </div>
             <div className="grid gap-1.5"><Label className="text-xs">Motivo</Label><Input value={movForm.motivo || ''} onChange={e => setMovForm({ ...movForm, motivo: e.target.value })} /></div>
@@ -722,8 +722,8 @@ export default function Inventario() {
             <div className="grid gap-1.5"><Label className="text-xs">Nombre *</Label><Input placeholder="Ej: Comedor 6 puestos" value={muebleForm.nombre || ''} onChange={e => setMuebleForm({ ...muebleForm, nombre: e.target.value })} /></div>
             <div className="grid gap-1.5"><Label className="text-xs">Descripción</Label><Textarea placeholder="Materiales, dimensiones, acabados..." value={muebleForm.descripcion || ''} onChange={e => setMuebleForm({ ...muebleForm, descripcion: e.target.value })} rows={3} /></div>
             <div className="grid grid-cols-2 gap-4">
-              <div className="grid gap-1.5"><Label className="text-xs">Precio</Label><Input type="number" value={muebleForm.precio || ''} onChange={e => setMuebleForm({ ...muebleForm, precio: +e.target.value || 0 })} /></div>
-              <div className="grid gap-1.5"><Label className="text-xs">Cantidad disponible</Label><Input type="number" value={muebleForm.stock || 1} onChange={e => setMuebleForm({ ...muebleForm, stock: +e.target.value })} /></div>
+              <div className="grid gap-1.5"><Label className="text-xs">Precio</Label><Input type="text" inputMode="decimal" value={muebleForm.precio === 0 ? '' : muebleForm.precio} onChange={e => { const v = e.target.value.replace(/[^0-9.]/g,''); setMuebleForm({ ...muebleForm, precio: v === '' ? 0 : parseFloat(v) || 0 }); }} placeholder="0" /></div>
+              <div className="grid gap-1.5"><Label className="text-xs">Cantidad disponible</Label><Input type="text" inputMode="numeric" value={muebleForm.stock} onChange={e => { const v = e.target.value.replace(/[^0-9]/g,''); setMuebleForm({ ...muebleForm, stock: v === '' ? 1 : parseInt(v) || 1 }); }} /></div>
             </div>
             <div className="flex items-center gap-3">
               <Label className="text-xs">Disponible para venta</Label>
