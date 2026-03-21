@@ -20,24 +20,17 @@ export default function CatalogoPublico() {
   const [enviado,    setEnviado]    = useState(false);
   const [cotForm,    setCotForm]    = useState({ nombre: '', telefono: '', descripcion: '' });
 
-  useEffect(() => {
-    const load = async () => {
-      const { data: muebs } = await db
-        .from('catalogo_muebles')
-        .select('*')
-        .eq('disponible', true)
-        .gte('stock', 1)
-        .order('nombre');
-      setMuebles(muebs || []);
-
-      const { data: cfg } = await db
-        .from('configuracion')
-        .select('clave, valor')
-        .in('clave', ['empresa_telefono', 'empresa_nombre', 'empresa_direccion']);
-      if (cfg) {
+  const cargarDatos = async () => {
+    try {
+      setLoading(true);
+      const [{ data: muebs, error: e1 }, { data: cfg, error: e2 }] = await Promise.all([
+        db.from('catalogo_muebles').select('*').eq('disponible', true).gte('stock', 1).order('nombre'),
+        db.from('configuracion').select('clave, valor').in('clave', ['empresa_telefono', 'empresa_nombre', 'empresa_direccion']),
+      ]);
+      if (!e1) setMuebles(muebs || []);
+      if (!e2 && cfg) {
         cfg.forEach((c: any) => {
           if (c.clave === 'empresa_telefono') {
-            // Limpiar número — quitar todo excepto dígitos, asegurar código de país
             const limpio = c.valor?.replace(/\D/g, '') || '';
             setTelefono(limpio.startsWith('1') ? limpio : `1${limpio}`);
           }
@@ -45,9 +38,24 @@ export default function CatalogoPublico() {
           if (c.clave === 'empresa_direccion') setDireccion(c.valor || direccion);
         });
       }
+    } catch (_) {
+      // Safari puede fallar silenciosamente — reintenta una vez
+      setTimeout(async () => {
+        try {
+          const { data: muebs } = await db.from('catalogo_muebles').select('*').eq('disponible', true).gte('stock', 1).order('nombre');
+          setMuebles(muebs || []);
+        } catch (_) {}
+      }, 1500);
+    } finally {
       setLoading(false);
-    };
-    load();
+    }
+  };
+
+  useEffect(() => {
+    cargarDatos();
+    // Seguridad: si loading queda atascado más de 8 segundos, forzar false
+    const t = setTimeout(() => setLoading(false), 8000);
+    return () => clearTimeout(t);
   }, []);
 
   const filtered = muebles.filter(m =>
@@ -160,8 +168,12 @@ export default function CatalogoPublico() {
             <p className="text-5xl mb-3">🛋️</p>
             <p className="font-medium text-gray-500">No hay productos disponibles en este momento</p>
             <p className="text-sm mt-1">Vuelve pronto o contáctanos directamente</p>
+            <button onClick={cargarDatos}
+              className="mt-3 inline-flex items-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-600 px-4 py-2 rounded-full text-sm font-medium transition-colors">
+              🔄 Recargar catálogo
+            </button>
             <a href={`https://wa.me/${telefono || '18095372374'}`} target="_blank" rel="noreferrer"
-              className="mt-4 inline-flex items-center gap-2 bg-green-500 hover:bg-green-600 text-white px-5 py-2.5 rounded-full text-sm font-medium transition-colors shadow">
+              className="mt-3 inline-flex items-center gap-2 bg-green-500 hover:bg-green-600 text-white px-5 py-2.5 rounded-full text-sm font-medium transition-colors shadow">
               💬 Contactar por WhatsApp
             </a>
           </div>
