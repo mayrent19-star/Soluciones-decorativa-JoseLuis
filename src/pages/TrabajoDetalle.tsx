@@ -45,8 +45,9 @@ export default function TrabajoDetalle() {
   const [asigDialog, setAsigDialog] = useState(false);
   const [matDialog,  setMatDialog]  = useState(false);
   const [pagoDialog, setPagoDialog] = useState(false);
-  const [ncfActivo,  setNcfActivo]  = useState(false);
-  const [ncfNumero,  setNcfNumero]  = useState('');
+  const [ncfActivo,      setNcfActivo]      = useState(false);
+  const [ncfNumero,      setNcfNumero]      = useState('');
+  const [garantiaActiva, setGarantiaActiva] = useState(false);
   const [asigForm, setAsigForm] = useState<any>({});
   const [matForm,  setMatForm]  = useState<any>({ id_item: '', cantidad: 1, costo_unitario: 0 });
   const [pagoForm, setPagoForm] = useState<any>({
@@ -182,8 +183,8 @@ export default function TrabajoDetalle() {
     <div class="section"><div class="section-title">Trabajo</div><div class="grid"><div class="field"><label>Descripción</label><p>${trabajo.descripcion_trabajo}</p></div><div class="field"><label>Categoría</label><p>${trabajo.categoria}</p></div><div class="field"><label>Estado</label><p>${trabajo.estado}</p></div><div class="field"><label>Inicio</label><p>${formatDate(trabajo.fecha_inicio)}</p></div></div></div>
     <div class="section"><div class="section-title">Pagos realizados</div><table class="items"><thead><tr><th>Fecha</th><th>Método</th><th class="text-right">Monto</th><th>Notas</th></tr></thead><tbody>${pagos.map((p: any) => `<tr><td>${formatDate(p.fecha)}</td><td>${p.metodo}</td><td class="text-right">${formatCurrency(p.monto)}</td><td>${p.notas||'—'}</td></tr>`).join('')}</tbody></table></div>
     <div class="totals"><table class="totals-table"><tr><td>Monto total</td><td class="text-right">${formatCurrency(montoTotal)}</td></tr><tr><td>Total pagado</td><td class="text-right">${formatCurrency(totalPagos)}</td></tr>${estadoPago}</table></div>
-    ${garantia ? `<div class="warranty"><strong>Garantía:</strong> ${garantia}</div>` : ''}
-    <div class="footer">${empNombre || 'Soluciones Decorativas José Luis'} — Tapicería &amp; Ebanistería</div>
+    ${garantiaActiva && garantia ? `<div class="warranty">${garantia}</div>` : ''}
+    <div class="footer">Soluciones Decorativas José Luis Moya SRL — Nuestro placer es complacerte</div>
     </body></html>`;
     const w = window.open('', '_blank', 'width=900,height=700');
     if (w) { w.document.write(html); w.document.close(); setTimeout(() => w.print(), 500); }
@@ -208,6 +209,12 @@ export default function TrabajoDetalle() {
                   onChange={e => { setNcfActivo(e.target.checked); if (!e.target.checked) setNcfNumero(''); }}
                   className="h-4 w-4 rounded border-gray-300 cursor-pointer" />
                 <label htmlFor="ncf-toggle" className="text-xs cursor-pointer select-none whitespace-nowrap">Factura Fiscal</label>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <input type="checkbox" id="garantia-toggle" checked={garantiaActiva}
+                  onChange={e => setGarantiaActiva(e.target.checked)}
+                  className="h-4 w-4 rounded border-gray-300 cursor-pointer" />
+                <label htmlFor="garantia-toggle" className="text-xs cursor-pointer select-none whitespace-nowrap">Garantía</label>
               </div>
               {ncfActivo && (
                 <input type="text" placeholder="NCF: B0100000001" value={ncfNumero}

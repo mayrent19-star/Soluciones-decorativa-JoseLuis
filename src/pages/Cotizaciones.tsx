@@ -37,7 +37,8 @@ export default function Cotizaciones() {
     fecha: new Date().toISOString().slice(0, 10), notas: ''
   });
   const [cotItems, setCotItems] = useState<any[]>([{ descripcion: '', cantidad: 1, precio_unitario: 0 }]);
-  const [aplicarItbis, setAplicarItbis] = useState(false);
+  const [aplicarItbis,    setAplicarItbis]    = useState(false);
+  const [garantiaActiva,  setGarantiaActiva]  = useState(false);
   const [clienteLibreNombre, setClienteLibreNombre] = useState('');
   const [clienteLibreRnc,    setClienteLibreRnc]    = useState('');
 
@@ -192,6 +193,7 @@ export default function Cotizaciones() {
     setForm({ id_cliente: '', estado: 'Pendiente', fecha: new Date().toISOString().slice(0, 10), notas: '' });
     setCotItems([{ descripcion: '', cantidad: 1, precio_unitario: 0 }]);
     setAplicarItbis(false);
+    setGarantiaActiva(false);
     setClienteLibreNombre('');
     setClienteLibreRnc('');
     setDialogOpen(true);
@@ -213,8 +215,7 @@ export default function Cotizaciones() {
 
   const viewDetail = async (cot: any) => {
     const { data } = await supabase.from('cotizacion_items').select('*').eq('id_cotizacion', cot.id);
-    const cl = clientes.find((c: any) => c.id === cot.id_cliente);
-    setDetailDialog({ ...cot, items: data || [], _cliente: cl || null });
+    setDetailDialog({ ...cot, items: data || [] });
     setAbonoMonto(''); setAbonoMetodo('Efectivo');
   };
 
@@ -238,8 +239,8 @@ export default function Cotizaciones() {
     <div class="section"><div class="section-title">Cliente</div><div class="grid"><div class="field"><label>Nombre</label><p>${nombrePDF}</p></div><div class="field"><label>RNC</label><p>${cot.rnc_cliente || cot.cliente_rnc_libre || '—'}</p></div><div class="field"><label>Teléfono</label><p>${telefonoPDF}</p></div><div class="field"><label>Dirección</label><p>${direccionPDF}</p></div></div></div>
     <div class="section"><div class="section-title">Detalle</div><table class="items"><thead><tr><th>Descripción</th><th class="text-right">Cant.</th><th class="text-right">P. Unit.</th><th class="text-right">Total</th></tr></thead><tbody>${(citems || []).map((i: any) => `<tr><td>${i.descripcion}</td><td class="text-right">${i.cantidad}</td><td class="text-right">${formatCurrency(i.precio_unitario)}</td><td class="text-right">${formatCurrency(i.cantidad * i.precio_unitario)}</td></tr>`).join('')}</tbody></table></div>
     <div class="totals"><table class="totals-table"><tr><td>Subtotal</td><td class="text-right">${formatCurrency(cot.subtotal)}</td></tr>${cot.itbis > 0 ? `<tr><td>ITBIS 18%</td><td class="text-right">${formatCurrency(cot.itbis)}</td></tr>` : ''}<tr class="total"><td><strong>TOTAL</strong></td><td class="text-right"><strong>${formatCurrency(cot.total)}</strong></td></tr></table></div>
-    ${garantia ? `<div class="warranty"><strong>Garantía:</strong> ${garantia}</div>` : ''}
-    <div class="footer">${empNombre || 'Soluciones Decorativas José Luis'} — Tapicería &amp; Ebanistería</div>
+    ${garantiaActiva && garantia ? `<div class="warranty">${garantia}</div>` : ''}
+    <div class="footer">Soluciones Decorativas José Luis Moya SRL — Nuestro placer es complacerte</div>
     </body></html>`;
     const w = window.open('', '_blank', 'width=900,height=700');
     if (w) { w.document.write(html); w.document.close(); setTimeout(() => w.print(), 500); }
@@ -338,15 +339,27 @@ export default function Cotizaciones() {
                 ))}
               </div>
               <div className="mt-3 text-right space-y-1">
-                <div className="flex items-center justify-end gap-2 mb-2">
-                  <input
-                    type="checkbox"
-                    id="aplicar-itbis"
-                    checked={aplicarItbis}
-                    onChange={e => setAplicarItbis(e.target.checked)}
-                    className="h-4 w-4 rounded border-gray-300 cursor-pointer"
-                  />
-                  <label htmlFor="aplicar-itbis" className="text-sm cursor-pointer select-none">Aplicar ITBIS (18%)</label>
+                <div className="flex items-center justify-end gap-4 mb-2 flex-wrap">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="aplicar-itbis"
+                      checked={aplicarItbis}
+                      onChange={e => setAplicarItbis(e.target.checked)}
+                      className="h-4 w-4 rounded border-gray-300 cursor-pointer"
+                    />
+                    <label htmlFor="aplicar-itbis" className="text-sm cursor-pointer select-none">Aplicar ITBIS (18%)</label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="aplicar-garantia"
+                      checked={garantiaActiva}
+                      onChange={e => setGarantiaActiva(e.target.checked)}
+                      className="h-4 w-4 rounded border-gray-300 cursor-pointer"
+                    />
+                    <label htmlFor="aplicar-garantia" className="text-sm cursor-pointer select-none">Incluir Garantía</label>
+                  </div>
                 </div>
                 <p className="text-sm">Subtotal: <span className="font-medium">{formatCurrency(subtotal)}</span></p>
                 {aplicarItbis && <p className="text-sm">ITBIS 18%: <span className="font-medium">{formatCurrency(itbis)}</span></p>}
@@ -354,7 +367,7 @@ export default function Cotizaciones() {
               </div>
             </div>
 
-            <div className="grid gap-1.5"><Label className="text-xs">Notas internas <span className="text-muted-foreground font-normal">(no aparecen en la cotización)</span></Label><Textarea value={form.notas || ''} onChange={e => setForm({ ...form, notas: e.target.value })} rows={2} placeholder="Observaciones internas, acuerdos verbales, recordatorios..." /></div>
+            <div className="grid gap-1.5"><Label className="text-xs">Notas</Label><Textarea value={form.notas || ''} onChange={e => setForm({ ...form, notas: e.target.value })} rows={2} /></div>
           </div>
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancelar</Button>
@@ -369,37 +382,12 @@ export default function Cotizaciones() {
           <DialogHeader><DialogTitle>Cotización {detailDialog?.numero_cotizacion}</DialogTitle></DialogHeader>
           {detailDialog && (
             <div className="space-y-4">
-              {/* Header con botón editar */}
-              <div className="flex items-start justify-between gap-2">
-                <div className="grid grid-cols-2 gap-3 text-sm flex-1">
-                  <div>
-                    <span className="text-muted-foreground text-xs">Cliente</span>
-                    <p className="font-medium">
-                      {detailDialog._cliente?.nombre_completo || detailDialog.cliente_nombre_libre || '—'}
-                      {!detailDialog.id_cliente && detailDialog.cliente_nombre_libre && (
-                        <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 font-medium">sin registrar</span>
-                      )}
-                    </p>
-                    {detailDialog._cliente?.telefono && <p className="text-xs text-muted-foreground mt-0.5">📞 {detailDialog._cliente.telefono}</p>}
-                    {detailDialog._cliente?.direccion && <p className="text-xs text-muted-foreground">📍 {detailDialog._cliente.direccion}</p>}
-                  </div>
-                  <div><span className="text-muted-foreground text-xs">Estado</span><p><Badge variant={estadosBadge[detailDialog.estado] || 'outline'}>{detailDialog.estado}</Badge></p></div>
-                  <div><span className="text-muted-foreground text-xs">Fecha</span><p>{formatDate(detailDialog.fecha)}</p></div>
-                  <div><span className="text-muted-foreground text-xs">Total</span><p className="font-bold text-primary">{formatCurrency(detailDialog.total)}</p></div>
-                </div>
-                {isOwner && detailDialog.estado === 'Pendiente' && (
-                  <Button size="sm" variant="outline" className="shrink-0 gap-1" onClick={() => { setDetailDialog(null); openEdit(detailDialog); }}>
-                    ✏️ Editar
-                  </Button>
-                )}
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div><span className="text-muted-foreground text-xs">Cliente</span><p className="font-medium">{clientes.find((c: any) => c.id === detailDialog.id_cliente)?.nombre_completo}</p></div>
+                <div><span className="text-muted-foreground text-xs">Estado</span><p><Badge variant={estadosBadge[detailDialog.estado] || 'outline'}>{detailDialog.estado}</Badge></p></div>
+                <div><span className="text-muted-foreground text-xs">Fecha</span><p>{formatDate(detailDialog.fecha)}</p></div>
+                <div><span className="text-muted-foreground text-xs">Total</span><p className="font-bold text-primary">{formatCurrency(detailDialog.total)}</p></div>
               </div>
-              {/* Notas internas — solo visibles aquí, no en PDF */}
-              {detailDialog.notas && (
-                <div className="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2">
-                  <p className="text-xs font-semibold text-amber-700 mb-0.5">📋 Notas internas</p>
-                  <p className="text-sm text-amber-900">{detailDialog.notas}</p>
-                </div>
-              )}
 
               <Table>
                 <TableHeader><TableRow>
