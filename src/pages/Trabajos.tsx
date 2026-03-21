@@ -45,7 +45,8 @@ const estados = ['Sin iniciar', 'En proceso', 'Finalizado', 'Entregado', 'Cancel
 
 // Siguiente estado en el flujo rápido
 const siguienteEstado: Record<string, string | null> = {
-  'En proceso': 'Finalizado',
+  'Sin iniciar': 'En proceso',
+  'En proceso':  'Finalizado',
   'Finalizado':  'Entregado',
   'Entregado':   null,
   'Cancelado':   null,
@@ -69,7 +70,7 @@ const estadoColor: Record<string, string> = {
 
 const empty = {
   id_cliente: '', descripcion_trabajo: '', categoria: 'Tapicería',
-  estado: 'En proceso', fecha_inicio: new Date().toISOString().slice(0, 10),
+  estado: 'Sin iniciar', fecha_inicio: new Date().toISOString().slice(0, 10),
   monto_final: null as number | null, abono: null as number | null,
   tipo_trabajo: 'Reparación' as (typeof tipos)[number],
   fotos_antes: [] as string[], fotos_despues: [] as string[],
