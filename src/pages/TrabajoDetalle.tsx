@@ -48,6 +48,7 @@ export default function TrabajoDetalle() {
   const [ncfActivo,      setNcfActivo]      = useState(false);
   const [ncfNumero,      setNcfNumero]      = useState('');
   const [garantiaActiva, setGarantiaActiva] = useState(false);
+  const [garantiaTexto,  setGarantiaTexto]  = useState('');
   const [asigForm, setAsigForm] = useState<any>({});
   const [matForm,  setMatForm]  = useState<any>({ id_item: '', cantidad: 1, costo_unitario: 0 });
   const [pagoForm, setPagoForm] = useState<any>({
@@ -152,6 +153,7 @@ export default function TrabajoDetalle() {
       getConfig('empresa_email'),
       getConfig('empresa_direccion'),
     ]);
+    const ncfCompleto  = ncfActivo && ncfNumero.trim() ? `B01${ncfNumero.trim()}` : '';
     const esFiscal    = ncfActivo && ncfNumero.trim() !== '';
     const tituloDoc   = esFiscal ? 'FACTURA FISCAL' : 'FACTURA';
     const colorTitulo = esFiscal ? '#185FA5' : '#EF5709';
@@ -174,7 +176,7 @@ export default function TrabajoDetalle() {
       </div>
       <div class="inv-info">
         <h2>${tituloDoc}</h2>
-        ${esFiscal ? `<div class="ncf-badge">NCF: ${ncfNumero.trim()}</div>` : ''}
+        ${esFiscal ? `<div class="ncf-badge">NCF: ${ncfCompleto}</div>` : ''}
         <p>Fecha: ${formatDate(new Date().toISOString().slice(0,10))}</p>
         <p>OT: ${trabajo.id.slice(0,8).toUpperCase()}</p>
       </div>
@@ -183,7 +185,8 @@ export default function TrabajoDetalle() {
     <div class="section"><div class="section-title">Trabajo</div><div class="grid"><div class="field"><label>Descripción</label><p>${trabajo.descripcion_trabajo}</p></div><div class="field"><label>Categoría</label><p>${trabajo.categoria}</p></div><div class="field"><label>Estado</label><p>${trabajo.estado}</p></div><div class="field"><label>Inicio</label><p>${formatDate(trabajo.fecha_inicio)}</p></div></div></div>
     <div class="section"><div class="section-title">Pagos realizados</div><table class="items"><thead><tr><th>Fecha</th><th>Método</th><th class="text-right">Monto</th><th>Notas</th></tr></thead><tbody>${pagos.map((p: any) => `<tr><td>${formatDate(p.fecha)}</td><td>${p.metodo}</td><td class="text-right">${formatCurrency(p.monto)}</td><td>${p.notas||'—'}</td></tr>`).join('')}</tbody></table></div>
     <div class="totals"><table class="totals-table"><tr><td>Monto total</td><td class="text-right">${formatCurrency(montoTotal)}</td></tr><tr><td>Total pagado</td><td class="text-right">${formatCurrency(totalPagos)}</td></tr>${estadoPago}</table></div>
-    ${garantiaActiva && garantia ? `<div class="warranty">${garantia}</div>` : ''}
+    ${garantia ? `<div class="warranty">${garantia}</div>` : ''}
+    ${garantiaActiva && garantiaTexto ? `<div class="warranty" style="margin-top:8px"><strong>Garantia:</strong> ${garantiaTexto}</div>` : ''}
     <div class="footer">Soluciones Decorativas José Luis Moya SRL — Nuestro placer es complacerte</div>
     </body></html>`;
     const w = window.open('', '_blank', 'width=900,height=700');
@@ -212,17 +215,25 @@ export default function TrabajoDetalle() {
               </div>
               <div className="flex items-center gap-1.5">
                 <input type="checkbox" id="garantia-toggle" checked={garantiaActiva}
-                  onChange={e => setGarantiaActiva(e.target.checked)}
+                  onChange={e => { setGarantiaActiva(e.target.checked); if (!e.target.checked) setGarantiaTexto(''); }}
                   className="h-4 w-4 rounded border-gray-300 cursor-pointer" />
                 <label htmlFor="garantia-toggle" className="text-xs cursor-pointer select-none whitespace-nowrap">Garantía</label>
               </div>
               {ncfActivo && (
-                <input type="text" placeholder="NCF: B0100000001" value={ncfNumero}
-                  onChange={e => setNcfNumero(e.target.value)}
-                  className="h-8 text-xs px-2 rounded-md border border-input bg-background w-40 focus:outline-none focus:ring-1 focus:ring-ring" />
+                <div className="flex items-center gap-1">
+                  <span className="text-xs font-mono font-semibold text-muted-foreground bg-secondary px-2 py-1 rounded-l-md border border-r-0 border-input h-8 flex items-center">B01</span>
+                  <input type="text" placeholder="00000001" maxLength={8} value={ncfNumero}
+                    onChange={e => setNcfNumero(e.target.value.replace(/\D/g,''))}
+                    className="h-8 text-xs px-2 rounded-r-md border border-input bg-background w-28 focus:outline-none focus:ring-1 focus:ring-ring font-mono" />
+                </div>
+              )}
+              {garantiaActiva && (
+                <input type="text" placeholder="Ej: 6 meses en mano de obra..." value={garantiaTexto}
+                  onChange={e => setGarantiaTexto(e.target.value)}
+                  className="h-8 text-xs px-2 rounded-md border border-input bg-background w-48 focus:outline-none focus:ring-1 focus:ring-ring" />
               )}
               <Button size="sm" variant="outline" onClick={generateInvoice}>
-                {ncfActivo && ncfNumero.trim() ? '🧾 Factura Fiscal' : 'Factura'}
+                {ncfActivo && ncfNumero.trim() ? '🧾 Factura Fiscal' : '🧾 Factura'}
               </Button>
             </div>
           </div>

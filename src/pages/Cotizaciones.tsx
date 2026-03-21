@@ -39,6 +39,9 @@ export default function Cotizaciones() {
   const [cotItems, setCotItems] = useState<any[]>([{ descripcion: '', cantidad: 1, precio_unitario: 0 }]);
   const [aplicarItbis,    setAplicarItbis]    = useState(false);
   const [garantiaActiva,  setGarantiaActiva]  = useState(false);
+  const [garantiaTexto,   setGarantiaTexto]   = useState('');
+  const [notaPDF,         setNotaPDF]         = useState('');
+  const [tipoCot,         setTipoCot]         = useState('Reparación');
   const [clienteLibreNombre, setClienteLibreNombre] = useState('');
   const [clienteLibreRnc,    setClienteLibreRnc]    = useState('');
 
@@ -194,6 +197,9 @@ export default function Cotizaciones() {
     setCotItems([{ descripcion: '', cantidad: 1, precio_unitario: 0 }]);
     setAplicarItbis(false);
     setGarantiaActiva(false);
+    setGarantiaTexto('');
+    setNotaPDF('');
+    setTipoCot('Reparación');
     setClienteLibreNombre('');
     setClienteLibreRnc('');
     setDialogOpen(true);
@@ -239,7 +245,9 @@ export default function Cotizaciones() {
     <div class="section"><div class="section-title">Cliente</div><div class="grid"><div class="field"><label>Nombre</label><p>${nombrePDF}</p></div><div class="field"><label>RNC</label><p>${cot.rnc_cliente || cot.cliente_rnc_libre || '—'}</p></div><div class="field"><label>Teléfono</label><p>${telefonoPDF}</p></div><div class="field"><label>Dirección</label><p>${direccionPDF}</p></div></div></div>
     <div class="section"><div class="section-title">Detalle</div><table class="items"><thead><tr><th>Descripción</th><th class="text-right">Cant.</th><th class="text-right">P. Unit.</th><th class="text-right">Total</th></tr></thead><tbody>${(citems || []).map((i: any) => `<tr><td>${i.descripcion}</td><td class="text-right">${i.cantidad}</td><td class="text-right">${formatCurrency(i.precio_unitario)}</td><td class="text-right">${formatCurrency(i.cantidad * i.precio_unitario)}</td></tr>`).join('')}</tbody></table></div>
     <div class="totals"><table class="totals-table"><tr><td>Subtotal</td><td class="text-right">${formatCurrency(cot.subtotal)}</td></tr>${cot.itbis > 0 ? `<tr><td>ITBIS 18%</td><td class="text-right">${formatCurrency(cot.itbis)}</td></tr>` : ''}<tr class="total"><td><strong>TOTAL</strong></td><td class="text-right"><strong>${formatCurrency(cot.total)}</strong></td></tr></table></div>
-    ${garantiaActiva && garantia ? `<div class="warranty">${garantia}</div>` : ''}
+    ${garantia ? `<div class="warranty">${garantia}</div>` : ''}
+    ${garantiaActiva && garantiaTexto ? `<div class="warranty" style="margin-top:8px"><strong>Garantia:</strong> ${garantiaTexto}</div>` : ''}
+    ${notaPDF ? `<div class="warranty" style="margin-top:8px;border-left-color:#EF5709">${notaPDF}</div>` : ''}
     <div class="footer">Soluciones Decorativas José Luis Moya SRL — Nuestro placer es complacerte</div>
     </body></html>`;
     const w = window.open('', '_blank', 'width=900,height=700');
@@ -367,7 +375,37 @@ export default function Cotizaciones() {
               </div>
             </div>
 
-            <div className="grid gap-1.5"><Label className="text-xs">Notas</Label><Textarea value={form.notas || ''} onChange={e => setForm({ ...form, notas: e.target.value })} rows={2} /></div>
+            <div className="grid gap-1.5">
+              <Label className="text-xs">Tipo de trabajo</Label>
+              <div className="flex gap-2">
+                {['Reparación','Fabricación'].map(t => (
+                  <button key={t} type="button"
+                    onClick={() => setTipoCot(t)}
+                    className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-colors ${tipoCot === t ? 'bg-primary text-primary-foreground border-primary' : 'bg-background border-border hover:bg-secondary'}`}>
+                    {t === 'Reparación' ? '🔧 Reparación' : '🪑 Fabricación'}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {tipoCot === 'Fabricación' && (
+              <div className="grid gap-1.5">
+                <Label className="text-xs">¿Qué se va a fabricar?</Label>
+                <div className="flex flex-wrap gap-2">
+                  {['Sala','Comedor','Habitación','Silla','Butaca','Sofá','Mueble de TV','Otro'].map(op => (
+                    <button key={op} type="button"
+                      onClick={() => setForm({ ...form, descripcion_fab: form.descripcion_fab === op ? '' : op })}
+                      className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${form.descripcion_fab === op ? 'bg-primary text-primary-foreground border-primary' : 'bg-background border-border hover:bg-secondary'}`}>
+                      {op}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            <div className="grid gap-1.5"><Label className="text-xs">Notas internas <span className="text-muted-foreground font-normal">(no aparecen en la cotización)</span></Label><Textarea value={form.notas || ''} onChange={e => setForm({ ...form, notas: e.target.value })} rows={2} placeholder="Observaciones internas, acuerdos verbales, recordatorios..." /></div>
+            <div className="grid gap-1.5"><Label className="text-xs">Nota para el cliente <span className="text-muted-foreground font-normal">(aparece en la cotización)</span></Label><Textarea value={notaPDF} onChange={e => setNotaPDF(e.target.value)} rows={2} placeholder="Ej: Tiempo estimado de entrega: 15 días hábiles..." /></div>
+            {garantiaActiva && (
+              <div className="grid gap-1.5"><Label className="text-xs">Texto de garantía para esta cotización</Label><input type="text" value={garantiaTexto} onChange={e => setGarantiaTexto(e.target.value)} placeholder="Ej: 6 meses en mano de obra y materiales..." className="h-9 px-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-1 focus:ring-ring" /></div>
+            )}
           </div>
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancelar</Button>

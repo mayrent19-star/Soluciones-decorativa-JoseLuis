@@ -26,7 +26,7 @@ export default function CatalogoPublico() {
         .from('catalogo_muebles')
         .select('*')
         .eq('disponible', true)
-        .gt('stock', 0)
+        .gte('stock', 1)
         .order('nombre');
       setMuebles(muebs || []);
 
@@ -95,6 +95,7 @@ export default function CatalogoPublico() {
               src="/icons/logo.png"
               alt="Soluciones Decorativas JL"
               className="w-full h-full object-cover"
+              crossOrigin="anonymous"
               onError={e => {
                 e.currentTarget.style.display = 'none';
                 e.currentTarget.parentElement!.innerHTML = '<div class="w-full h-full flex items-center justify-center text-4xl bg-blue-800">🛋️</div>';
@@ -174,7 +175,7 @@ export default function CatalogoPublico() {
               onClick={() => setSelected(m)}
             >
               {m.foto_url
-                ? <img src={m.foto_url} alt={m.nombre} className="w-full h-40 object-cover group-hover:opacity-95 transition-opacity" />
+                ? <img src={m.foto_url} alt={m.nombre} className="w-full h-40 object-cover group-hover:opacity-95 transition-opacity" crossOrigin="anonymous" loading="lazy" onError={e => { e.currentTarget.style.display='none'; }} />
                 : <div className="w-full h-40 bg-gray-100 flex items-center justify-center text-4xl">🛋️</div>
               }
               <div className="p-2.5">
@@ -205,7 +206,7 @@ export default function CatalogoPublico() {
           <div className="bg-white rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl"
             onClick={e => e.stopPropagation()}>
             {selected.foto_url && (
-              <img src={selected.foto_url} alt={selected.nombre} className="w-full h-56 object-cover" />
+              <img src={selected.foto_url} alt={selected.nombre} className="w-full h-56 object-cover" crossOrigin="anonymous" loading="eager" />
             )}
             <div className="p-4 space-y-3">
               <div className="flex items-start justify-between gap-2">
