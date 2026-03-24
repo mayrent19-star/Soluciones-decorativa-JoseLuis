@@ -530,10 +530,13 @@ export default function Reportes() {
               const imprimirHoja = () => {
                 const filas = itemsUbic.map((i: any) => `
                   <tr style="border-bottom:1px solid #eee">
+                    <td style="padding:8px 12px;font-size:11px;color:#888">${i.sku || '—'}</td>
                     <td style="padding:8px 12px">${i.nombre_item}</td>
                     <td style="padding:8px 12px;text-align:center">${i.categoria}</td>
                     <td style="padding:8px 12px;text-align:center">${i.unidad}</td>
                     <td style="padding:8px 12px;text-align:center;font-weight:bold">${i.stock_actual ?? 0}</td>
+                    <td style="padding:8px 12px;text-align:right">${i.costo_unitario ? 'RD$'+i.costo_unitario.toLocaleString('es-DO') : '—'}</td>
+                    <td style="padding:8px 12px;text-align:right;font-weight:bold">${i.costo_unitario && i.stock_actual ? 'RD$'+(i.costo_unitario*i.stock_actual).toLocaleString('es-DO') : '—'}</td>
                   </tr>`).join('');
                 const html = `<!DOCTYPE html><html><head><meta charset="UTF-8">
                   <title>Inventario ${ubicacionFilter}</title>
@@ -547,7 +550,7 @@ export default function Reportes() {
                   </style></head><body>
                   <h1>Inventario — ${ubicacionFilter === 'todas' ? 'Todas las Ubicaciones' : ubicacionFilter}</h1>
                   <h2>Soluciones Decorativas José Luis &nbsp;|&nbsp; Fecha: ${new Date().toLocaleDateString('es-DO')}</h2>
-                  <table><thead><tr><th>Artículo</th><th>Categoría</th><th>Unidad</th><th>Stock Actual</th></tr></thead>
+                  <table><thead><tr><th>SKU</th><th>Artículo</th><th>Categoría</th><th>Unidad</th><th>Stock</th><th>Costo Unit.</th><th>Valor Est.</th></tr></thead>
                   <tbody>${filas}</tbody></table>
                   <div class="firma">
                     <div><div class="linea"></div><p>Encargado de almacén</p></div>
@@ -570,6 +573,22 @@ export default function Reportes() {
                       🖨️ Imprimir hoja de almacén
                     </Button>
                   </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    <div className="bg-secondary/40 rounded-xl p-3 text-center">
+                      <p className="text-xs text-muted-foreground">Total artículos</p>
+                      <p className="text-xl font-bold">{itemsUbic.length}</p>
+                    </div>
+                    <div className="bg-secondary/40 rounded-xl p-3 text-center">
+                      <p className="text-xs text-muted-foreground">Con precio definido</p>
+                      <p className="text-xl font-bold">{itemsUbic.filter((i: any) => i.costo_unitario > 0).length}</p>
+                    </div>
+                    <div className="bg-blue-50 dark:bg-blue-950/20 rounded-xl p-3 text-center col-span-2 sm:col-span-1">
+                      <p className="text-xs text-muted-foreground">Valor estimado total</p>
+                      <p className="text-xl font-bold text-blue-700 dark:text-blue-400">
+                        {formatCurrency(itemsUbic.reduce((s: number, i: any) => s + ((i.costo_unitario || 0) * (i.stock_actual || 0)), 0))}
+                      </p>
+                    </div>
+                  </div>
 
                   {/* Stock por ubicación */}
                   <div className="border rounded-lg overflow-x-auto">
@@ -580,12 +599,17 @@ export default function Reportes() {
                         <TableHead className="hidden sm:table-cell">Ubicación</TableHead>
                         <TableHead className="text-center">Stock</TableHead>
                         <TableHead className="hidden sm:table-cell text-center">Mín.</TableHead>
+                        <TableHead className="hidden sm:table-cell text-right">Costo Unit.</TableHead>
+                        <TableHead className="text-right">Valor Est.</TableHead>
                       </TableRow></TableHeader>
                       <TableBody>
-                        {itemsUbic.length === 0 && <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-6">Sin artículos</TableCell></TableRow>}
+                        {itemsUbic.length === 0 && <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-6">Sin artículos</TableCell></TableRow>}
                         {itemsUbic.map((i: any) => (
                           <TableRow key={i.id}>
-                            <TableCell className="font-medium">{i.nombre_item}</TableCell>
+                            <TableCell className="font-medium">
+                              {i.nombre_item}
+                              {i.sku && <span className="block text-xs text-muted-foreground font-mono">{i.sku}</span>}
+                            </TableCell>
                             <TableCell className="hidden sm:table-cell text-muted-foreground text-sm">{i.categoria}</TableCell>
                             <TableCell className="hidden sm:table-cell text-muted-foreground text-sm">{i.ubicacion || '—'}</TableCell>
                             <TableCell className="text-center">
@@ -594,6 +618,10 @@ export default function Reportes() {
                               </Badge>
                             </TableCell>
                             <TableCell className="hidden sm:table-cell text-center text-muted-foreground">{i.stock_minimo ?? 0}</TableCell>
+                            <TableCell className="hidden sm:table-cell text-right text-muted-foreground text-sm">{i.costo_unitario ? formatCurrency(i.costo_unitario) : '—'}</TableCell>
+                            <TableCell className="text-right font-medium">
+                              {i.costo_unitario && i.stock_actual ? formatCurrency(i.costo_unitario * i.stock_actual) : '—'}
+                            </TableCell>
                           </TableRow>
                         ))}
                       </TableBody>

@@ -21,6 +21,10 @@ const db = supabase as any;
 
 // ── Materia prima ──────────────────────────────────────────────
 const categorias  = ['Tela', 'Madera', 'Espuma', 'Pegamento', 'Herramienta', 'Acabado', 'Otro'];
+const skuPrefijo: Record<string, string> = {
+  'Tela': 'TEL', 'Madera': 'MAD', 'Espuma': 'ESP',
+  'Pegamento': 'PEG', 'Herramienta': 'HER', 'Acabado': 'ACA', 'Otro': 'OTR',
+};
 const ubicaciones = ['Almacén Casa', 'Local Mercede', 'Local Calle 8', 'Telas', 'Almacén Taller'];
 const unidades    = ['unidad', 'yarda', 'metro', 'pie', 'galón', 'plancha', 'caja', 'rollo'];
 const emptyItem  = { nombre_item: '', categoria: 'Tela', unidad: 'unidad', stock_actual: null as number | null, stock_minimo: null as number | null, costo_unitario: 0, ubicacion: '' };
@@ -155,6 +159,13 @@ export default function Inventario() {
     const data    = { ...form };
     delete data.id; delete data.created_at; delete data.updated_at;
     if (fotoUrl) data.foto_url = fotoUrl;
+    // Generar SKU automático solo para artículos nuevos sin SKU
+    if (!form.id && !data.sku) {
+      const prefijo = skuPrefijo[data.categoria] || 'ART';
+      const existentes = items.filter((i: any) => i.sku?.startsWith(prefijo));
+      const siguiente = String(existentes.length + 1).padStart(3, '0');
+      data.sku = `${prefijo}-${siguiente}`;
+    }
     if (form.id) await updateRow('inventario', form.id, data);
     else          await insertRow('inventario', data);
     reload(); setDialogOpen(false); setForm(emptyItem);
@@ -378,7 +389,10 @@ export default function Inventario() {
                           </div>
                       }
                     </TableCell>
-                    <TableCell className="font-medium">{i.nombre_item}</TableCell>
+                    <TableCell className="font-medium">
+                      {i.nombre_item}
+                      {i.sku && <span className="block text-xs text-muted-foreground font-mono">{i.sku}</span>}
+                    </TableCell>
                     <TableCell className="hidden sm:table-cell text-muted-foreground">{i.categoria}</TableCell>
                     <TableCell className="text-right">
                       <Badge variant={i.stock_actual <= i.stock_minimo ? 'destructive' : 'secondary'}>
@@ -579,6 +593,12 @@ export default function Inventario() {
           <DialogHeader><DialogTitle>{form.id ? 'Editar' : 'Nuevo'} Artículo</DialogTitle></DialogHeader>
           <div className="grid gap-4 py-2 max-h-[70vh] overflow-y-auto pr-1">
             <div className="grid gap-1.5"><Label className="text-xs">Nombre *</Label><Input value={form.nombre_item || ''} onChange={e => setForm({ ...form, nombre_item: e.target.value })} /></div>
+            {form.id && form.sku && (
+              <div className="grid gap-1.5">
+                <Label className="text-xs">SKU <span className="text-muted-foreground font-normal">(generado automáticamente)</span></Label>
+                <Input value={form.sku} readOnly className="font-mono bg-secondary/40 text-muted-foreground" />
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-1.5"><Label className="text-xs">Categoría</Label>
                 <Select value={form.categoria} onValueChange={v => setForm({ ...form, categoria: v })}>
