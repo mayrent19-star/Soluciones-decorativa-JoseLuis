@@ -21,6 +21,9 @@ import Proveedores from "./pages/Proveedores";
 import KPIs from "./pages/KPIs";
 import Reportes from "./pages/Reportes";
 import Configuracion from "./pages/Configuracion";
+import Calendario from "./pages/Calendario";
+import Ofertas from "./pages/Ofertas";
+import CatalogoPublico from "./pages/CatalogoPublico";
 import NotFound from "./pages/NotFound";
 
 // ✅ FIX 1: QueryClient con configuración correcta
@@ -78,6 +81,9 @@ const App = () => (
             <Route path="/kpis"          element={<P ownerOnly><KPIs /></P>} />
             <Route path="/reportes"      element={<P ownerOnly><Reportes /></P>} />
             <Route path="/configuracion" element={<P ownerOnly><Configuracion /></P>} />
+            <Route path="/calendario"    element={<P><Calendario /></P>} />
+            <Route path="/ofertas"       element={<P ownerOnly><Ofertas /></P>} />
+            <Route path="/catalogo"      element={<CatalogoPublico />} />
             <Route path="*"              element={<NotFound />} />
           </Routes>
         </BrowserRouter>
