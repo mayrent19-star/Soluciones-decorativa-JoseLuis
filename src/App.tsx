@@ -83,7 +83,7 @@ const App = () => (
             <Route path="/configuracion" element={<P ownerOnly><Configuracion /></P>} />
             <Route path="/calendario"    element={<P><Calendario /></P>} />
             <Route path="/ofertas"       element={<P ownerOnly><Ofertas /></P>} />
-            <Route path="/catalogo"      element={<CatalogoPublico />} />
+            <Route path="/catalogo-publico" element={<CatalogoPublico />} />
             <Route path="*"              element={<NotFound />} />
           </Routes>
         </BrowserRouter>
