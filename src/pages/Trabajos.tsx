@@ -74,7 +74,8 @@ const empty = {
   monto_final: null as number | null, abono: null as number | null,
   tipo_trabajo: 'Reparación' as (typeof tipos)[number],
   fotos_antes: [] as string[], fotos_despues: [] as string[],
-  foto_muestra: '' as string, foto_final: '' as string, notas: ''
+  foto_muestra: '' as string, foto_final: '' as string, notas: '',
+  nombre_libre: '', rnc_libre: ''
 };
 
 function safeNumber(n: any) { const v = Number(n); return Number.isFinite(v) ? v : null; }
@@ -431,6 +432,10 @@ export default function Trabajos() {
                 clientes={clientes}
                 value={form.id_cliente || ''}
                 onChange={v => setForm({ ...form, id_cliente: v })}
+                nombreLibre={form.nombre_libre || ''}
+                rncLibre={form.rnc_libre || ''}
+                onNombreLibre={v => setForm({ ...form, nombre_libre: v })}
+                onRncLibre={v => setForm({ ...form, rnc_libre: v })}
               />
             <div className="grid gap-1.5">
               <Label className="text-xs">Descripción *</Label>
