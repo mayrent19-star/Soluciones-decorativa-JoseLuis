@@ -16,14 +16,11 @@ import Empleados from "./pages/Empleados";
 import Inventario from "./pages/Inventario";
 import CajaChica from "./pages/CajaChica";
 import Cotizaciones from "./pages/Cotizaciones";
+import Ventas from "./pages/Ventas";
 import Proveedores from "./pages/Proveedores";
 import KPIs from "./pages/KPIs";
 import Reportes from "./pages/Reportes";
 import Configuracion from "./pages/Configuracion";
-import Calendario from "./pages/Calendario";
-import Ofertas from "./pages/Ofertas";
-import CatalogoPublico from "./pages/CatalogoPublico";
-import Auditoria from "./pages/Auditoria";
 import NotFound from "./pages/NotFound";
 
 // ✅ FIX 1: QueryClient con configuración correcta
@@ -68,7 +65,6 @@ const App = () => (
           <Routes>
             <Route path="/"              element={<Index />} />
             <Route path="/auth"          element={<Auth />} />
-            <Route path="/catalogo-publico" element={<CatalogoPublico />} />
             <Route path="/dashboard"     element={<P><Dashboard /></P>} />
             <Route path="/clientes"      element={<P><Clientes /></P>} />
             <Route path="/trabajos"      element={<P><Trabajos /></P>} />
@@ -77,13 +73,11 @@ const App = () => (
             <Route path="/inventario"    element={<P><Inventario /></P>} />
             <Route path="/caja"          element={<P ownerOnly><CajaChica /></P>} />
             <Route path="/cotizaciones"  element={<P><Cotizaciones /></P>} />
+            <Route path="/ventas"        element={<P ownerOnly><Ventas /></P>} />
             <Route path="/proveedores"   element={<P ownerOnly><Proveedores /></P>} />
             <Route path="/kpis"          element={<P ownerOnly><KPIs /></P>} />
             <Route path="/reportes"      element={<P ownerOnly><Reportes /></P>} />
             <Route path="/configuracion" element={<P ownerOnly><Configuracion /></P>} />
-            <Route path="/calendario"    element={<P><Calendario /></P>} />
-            <Route path="/ofertas"       element={<P ownerOnly><Ofertas /></P>} />
-            <Route path="/auditoria"     element={<P ownerOnly><Auditoria /></P>} />
             <Route path="*"              element={<NotFound />} />
           </Routes>
         </BrowserRouter>
