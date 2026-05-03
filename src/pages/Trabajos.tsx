@@ -530,7 +530,7 @@ export default function Trabajos() {
               </div>
             </div>
 
-            {/* Fotos Reparación */}}
+            {/* Fotos Reparación */}
             {form.tipo_trabajo === 'Reparación' && (
               <div className="space-y-3">
                 <div className="grid gap-1.5">
