@@ -74,7 +74,9 @@ const empty = {
   monto_final: null as number | null, abono: null as number | null,
   tipo_trabajo: 'Reparación' as (typeof tipos)[number],
   fotos_antes: [] as string[], fotos_despues: [] as string[],
-  foto_muestra: '' as string, foto_final: '' as string, notas: ''
+  foto_muestra: '' as string, foto_final: '' as string, notas: '',
+  nombre_libre: '', rnc_libre: '',
+  origen: 'Cliente', local_trabajo: 'Principal'
 };
 
 function safeNumber(n: any) { const v = Number(n); return Number.isFinite(v) ? v : null; }
@@ -100,6 +102,7 @@ export default function Trabajos() {
   const [clientes, setClientes] = useState<any[]>([]);
   const [search, setSearch]     = useState('');
   const [estadoFilter, setEstadoFilter] = useState('todos');
+  const [origenFilter, setOrigenFilter] = useState('todos');
   const [dialogOpen, setDialogOpen]     = useState(false);
   const [form, setForm]                 = useState<any>(empty);
   const [deleteId, setDeleteId]         = useState<string | null>(null);
@@ -159,7 +162,8 @@ export default function Trabajos() {
     const ms = i.descripcion_trabajo?.toLowerCase().includes(search.toLowerCase()) ||
       clienteNombre(i.id_cliente).toLowerCase().includes(search.toLowerCase());
     const me = estadoFilter === 'todos' || i.estado === estadoFilter;
-    return ms && me;
+    const mo = origenFilter === 'todos' || (i.origen || 'Cliente') === origenFilter;
+    return ms && me && mo;
   });
 
   // ── Cambio rápido de estado desde la lista ──
@@ -184,8 +188,11 @@ export default function Trabajos() {
   };
 
   const handleSave = async () => {
-    if (!form.id_cliente || !form.descripcion_trabajo) {
-      toast({ title: 'Completa los campos requeridos', variant: 'destructive' }); return;
+    if (form.origen === 'Cliente' && !form.id_cliente && !form.nombre_libre) {
+      toast({ title: 'Selecciona o escribe un cliente', variant: 'destructive' }); return;
+    }
+    if (!form.descripcion_trabajo) {
+      toast({ title: 'La descripción es requerida', variant: 'destructive' }); return;
     }
     const montoTotal = safeNumber(form.monto_final);
     const abono      = safeNumber(form.abono);
@@ -275,10 +282,18 @@ export default function Trabajos() {
               <Input placeholder="Buscar..." value={search} onChange={e => setSearch(e.target.value)} className="pl-9" />
             </div>
             <Select value={estadoFilter} onValueChange={setEstadoFilter}>
-              <SelectTrigger className="w-full sm:w-[180px]"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="w-full sm:w-[150px]"><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="todos">Todos</SelectItem>
+                <SelectItem value="todos">Todos los estados</SelectItem>
                 {estados.map(e => <SelectItem key={e} value={e}>{e}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Select value={origenFilter} onValueChange={setOrigenFilter}>
+              <SelectTrigger className="w-full sm:w-[150px]"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos los orígenes</SelectItem>
+                <SelectItem value="Cliente">👤 De cliente</SelectItem>
+                <SelectItem value="De la casa">🏠 De la casa</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -290,6 +305,7 @@ export default function Trabajos() {
                   <TableHead>Descripción</TableHead>
                   <TableHead className="hidden sm:table-cell">Cliente</TableHead>
                   <TableHead>Estado</TableHead>
+                  <TableHead className="hidden sm:table-cell">Origen</TableHead>
                   <TableHead className="hidden md:table-cell">Categoría</TableHead>
                   <TableHead className="hidden lg:table-cell text-right">Monto</TableHead>
                   <TableHead className="w-[110px]">Acciones</TableHead>
@@ -321,6 +337,11 @@ export default function Trabajos() {
                             {t.estado}
                           </span>
                         )}
+                      </TableCell>
+                      <TableCell className="hidden sm:table-cell">
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${t.origen === 'De la casa' ? 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300' : 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300'}`}>
+                          {t.origen === 'De la casa' ? '🏠 Casa' : '👤 Cliente'}
+                        </span>
                       </TableCell>
                       <TableCell className="hidden md:table-cell text-muted-foreground">{t.categoria}</TableCell>
                       <TableCell className="hidden lg:table-cell text-right">{formatCurrency(t.monto_final ?? 0)}</TableCell>
@@ -427,11 +448,22 @@ export default function Trabajos() {
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>{form.id ? 'Editar' : 'Nuevo'} Trabajo</DialogTitle></DialogHeader>
           <div className="grid gap-4 py-2">
-            <ClienteSelector
+            {form.origen !== 'De la casa' ? (
+              <ClienteSelector
                 clientes={clientes}
                 value={form.id_cliente || ''}
                 onChange={v => setForm({ ...form, id_cliente: v })}
+                nombreLibre={form.nombre_libre || ''}
+                rncLibre={form.rnc_libre || ''}
+                onNombreLibre={v => setForm({ ...form, nombre_libre: v })}
+                onRncLibre={v => setForm({ ...form, rnc_libre: v })}
               />
+            ) : (
+              <div className="p-3 rounded-lg border border-orange-200 bg-orange-50/50 dark:bg-orange-950/20">
+                <p className="text-xs text-orange-700 dark:text-orange-400 font-medium">Trabajo de la casa sin cliente</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Este trabajo es del dueno para vender o mejorar.</p>
+              </div>
+            )}
             <div className="grid gap-1.5">
               <Label className="text-xs">Descripción *</Label>
               <Textarea value={form.descripcion_trabajo || ''} onChange={e => setForm({ ...form, descripcion_trabajo: e.target.value })} rows={2} />
@@ -474,7 +506,31 @@ export default function Trabajos() {
               </div>
             </div>
 
-            {/* Fotos Reparación */}
+            {/* Origen y Local */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-1.5">
+                <Label className="text-xs">Origen</Label>
+                <Select value={form.origen || 'Cliente'} onValueChange={v => setForm({ ...form, origen: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Cliente">👤 De cliente</SelectItem>
+                    <SelectItem value="De la casa">🏠 De la casa</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-1.5">
+                <Label className="text-xs">Local</Label>
+                <Select value={form.local_trabajo || 'Principal'} onValueChange={v => setForm({ ...form, local_trabajo: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Principal">Principal</SelectItem>
+                    <SelectItem value="Local Mercedes">Local Mercedes</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {/* Fotos Reparación */}}
             {form.tipo_trabajo === 'Reparación' && (
               <div className="space-y-3">
                 <div className="grid gap-1.5">

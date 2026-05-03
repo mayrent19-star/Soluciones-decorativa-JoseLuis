@@ -106,6 +106,15 @@ export default function Inventario() {
   const [searchMueble, setSearchMueble] = useState('');
   const muebleFileRef = useRef<HTMLInputElement>(null);
 
+  // ── Estado: inventario casa ──
+  const [invCasa, setInvCasa]           = useState<any[]>([]);
+  const [invCasaDialog, setInvCasaDialog] = useState(false);
+  const [invCasaForm, setInvCasaForm]   = useState<any>({ nombre: '', descripcion: '', tipo: 'Estructura', estado: 'Sin terminar', ubicacion: 'Local Mercedes', notas: '' });
+  const [invCasaFotoFile, setInvCasaFotoFile] = useState<File | null>(null);
+  const [invCasaFotoPreview, setInvCasaFotoPreview] = useState<string | null>(null);
+  const [deleteInvCasaId, setDeleteInvCasaId] = useState<string | null>(null);
+  const invCasaFileRef = useRef<HTMLInputElement>(null);
+
   // ── Estado: galería ──
   const [galeria, setGaleria]           = useState<any[]>([]);
   const [galeriaDialog, setGaleriaDialog] = useState(false);
@@ -138,7 +147,12 @@ export default function Inventario() {
     setGaleria(data || []);
   };
 
-  useEffect(() => { reload(); reloadMuebles(); reloadGaleria(); }, []);
+  const reloadInvCasa = async () => {
+    const { data } = await db.from('inventario_casa').select('*').order('created_at', { ascending: false });
+    setInvCasa(data || []);
+  };
+
+  useEffect(() => { reload(); reloadMuebles(); reloadGaleria(); reloadInvCasa(); }, []);
 
   // ════════════════════════════════════════════════
   // MATERIA PRIMA
@@ -312,7 +326,7 @@ export default function Inventario() {
         <TabsList className="flex-wrap h-auto gap-1">
           <TabsTrigger value="articulos">Materia Prima</TabsTrigger>
           <TabsTrigger value="muebles">Catálogo 🛋️</TabsTrigger>
-          <TabsTrigger value="galeria">Galería 📸</TabsTrigger>
+          <TabsTrigger value="galeria">🏠 Inv. Casa</TabsTrigger>
           <TabsTrigger value="movimientos">Movimientos ({movs.length})</TabsTrigger>
         </TabsList>
 
@@ -476,41 +490,149 @@ export default function Inventario() {
         </TabsContent>
 
         {/* ══════════════ GALERÍA ══════════════ */}
+        {/* ══════════════ INVENTARIO CASA ══════════════ */}
         <TabsContent value="galeria" className="mt-4 space-y-4">
-          {isOwner && (
-            <div className="flex justify-end">
-              <Button onClick={() => { setGaleriaForm(emptyFotoGaleria); setGaleriaFiles([]); setGaleriaPreviews([]); setGaleriaDialog(true); }}>
-                <Camera className="h-4 w-4 mr-1" />Agregar Fotos
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-muted-foreground">Estructuras, muebles sin terminar y piezas del dueño</p>
+            </div>
+            {isOwner && (
+              <Button onClick={() => { setInvCasaForm({ nombre: '', descripcion: '', tipo: 'Estructura', estado: 'Sin terminar', ubicacion: 'Local Mercedes', notas: '' }); setInvCasaFotoFile(null); setInvCasaFotoPreview(null); setInvCasaDialog(true); }}>
+                <Plus className="h-4 w-4 mr-1" />Agregar pieza
               </Button>
+            )}
+          </div>
+
+          {/* Resumen por estado */}
+          {invCasa.length > 0 && (
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              {['Sin terminar','En proceso','Listo para vender','Vendido'].map(est => {
+                const count = invCasa.filter(i => i.estado === est).length;
+                const colors: Record<string,string> = { 'Sin terminar':'bg-slate-100 text-slate-700', 'En proceso':'bg-blue-100 text-blue-700', 'Listo para vender':'bg-green-100 text-green-700', 'Vendido':'bg-gray-100 text-gray-500' };
+                return (
+                  <div key={est} className={`rounded-xl p-3 text-center ${colors[est]}`}>
+                    <p className="text-xl font-bold">{count}</p>
+                    <p className="text-xs">{est}</p>
+                  </div>
+                );
+              })}
             </div>
           )}
 
-          {galeria.length === 0 && (
+          {invCasa.length === 0 && (
             <div className="text-center py-16 text-muted-foreground">
-              <Camera className="h-12 w-12 mx-auto mb-3 opacity-30" />
-              <p className="text-sm">La galería está vacía.</p>
-              <p className="text-xs mt-1">Sube fotos de trabajos terminados para tener un portafolio visual.</p>
+              <p className="text-sm">Sin piezas registradas.</p>
+              <p className="text-xs mt-1">Agrega estructuras, espaldas y muebles del dueño aquí.</p>
             </div>
           )}
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-            {galeria.map((g: any) => (
-              <div key={g.id}
-                className="relative rounded-xl overflow-hidden border aspect-square cursor-pointer group"
-                onClick={() => setGaleriaVer(g)}
-              >
-                <img src={g.foto_url} alt={g.titulo || 'Trabajo'} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
-                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-end">
-                  <div className="opacity-0 group-hover:opacity-100 transition-opacity p-2 w-full">
-                    {g.titulo && <p className="text-white text-xs font-semibold truncate">{g.titulo}</p>}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {invCasa.map((p: any) => {
+              const estadoColor: Record<string,string> = { 'Sin terminar':'bg-slate-100 text-slate-700 dark:bg-slate-800/40', 'En proceso':'bg-blue-100 text-blue-700 dark:bg-blue-900/30', 'Listo para vender':'bg-green-100 text-green-700 dark:bg-green-900/30', 'Vendido':'bg-gray-100 text-gray-500' };
+              return (
+                <div key={p.id} className="border rounded-xl overflow-hidden bg-card flex gap-3">
+                  {p.foto_url
+                    ? <img src={p.foto_url} alt={p.nombre} className="w-24 h-24 object-cover shrink-0" />
+                    : <div className="w-24 h-24 bg-secondary flex items-center justify-center shrink-0 text-2xl">🪑</div>
+                  }
+                  <div className="flex-1 min-w-0 p-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="font-semibold text-sm truncate">{p.nombre}</p>
+                      {isOwner && (
+                        <button onClick={() => setDeleteInvCasaId(p.id)} className="shrink-0">
+                          <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                        </button>
+                      )}
+                    </div>
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${estadoColor[p.estado]}`}>{p.estado}</span>
+                    {p.descripcion && <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{p.descripcion}</p>}
+                    <p className="text-xs text-muted-foreground mt-1">{p.ubicacion} · {p.tipo}</p>
+                    {isOwner && p.estado !== 'Vendido' && (
+                      <div className="mt-2 flex gap-1">
+                        {['Sin terminar','En proceso','Listo para vender'].filter(e => e !== p.estado).map(sig => (
+                          <button key={sig} onClick={async () => { await db.from('inventario_casa').update({ estado: sig }).eq('id', p.id); reloadInvCasa(); }}
+                            className="text-xs px-2 py-0.5 rounded border hover:bg-secondary transition-colors">
+                            → {sig === 'Listo para vender' ? 'Listo' : sig}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
-                <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <ZoomIn className="h-5 w-5 text-white drop-shadow" />
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
+
+          {/* Dialog agregar pieza */}
+          <Dialog open={invCasaDialog} onOpenChange={setInvCasaDialog}>
+            <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+              <DialogHeader><DialogTitle>Nueva pieza — Inventario Casa</DialogTitle></DialogHeader>
+              <div className="grid gap-4 py-2">
+                <div className="grid gap-1.5"><Label className="text-xs">Nombre *</Label><Input placeholder="Ej: Espalda sin forrar, Base de cama..." value={invCasaForm.nombre} onChange={e => setInvCasaForm({...invCasaForm, nombre: e.target.value})} /></div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="grid gap-1.5">
+                    <Label className="text-xs">Tipo</Label>
+                    <Select value={invCasaForm.tipo} onValueChange={v => setInvCasaForm({...invCasaForm, tipo: v})}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {['Estructura','Espalda','Base de cama','Mueble completo','Otro'].map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="grid gap-1.5">
+                    <Label className="text-xs">Estado</Label>
+                    <Select value={invCasaForm.estado} onValueChange={v => setInvCasaForm({...invCasaForm, estado: v})}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {['Sin terminar','En proceso','Listo para vender'].map(e => <SelectItem key={e} value={e}>{e}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="grid gap-1.5">
+                  <Label className="text-xs">Ubicación</Label>
+                  <Select value={invCasaForm.ubicacion} onValueChange={v => setInvCasaForm({...invCasaForm, ubicacion: v})}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {['Principal','Local Mercedes','Almacén Casa','Almacén Taller'].map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid gap-1.5"><Label className="text-xs">Descripción</Label><Textarea value={invCasaForm.descripcion || ''} onChange={e => setInvCasaForm({...invCasaForm, descripcion: e.target.value})} rows={2} placeholder="Madera de caoba, sin tapizar, espalda de 1.20m..." /></div>
+                <div className="grid gap-1.5">
+                  <Label className="text-xs">Foto (opcional)</Label>
+                  <input ref={invCasaFileRef} type="file" accept="image/*" className="hidden" onChange={e => { const f = e.target.files?.[0]; if(f){ setInvCasaFotoFile(f); setInvCasaFotoPreview(URL.createObjectURL(f)); }}} />
+                  {invCasaFotoPreview
+                    ? <div className="relative"><img src={invCasaFotoPreview} className="w-full h-36 object-cover rounded-lg border" /><button onClick={() => {setInvCasaFotoFile(null); setInvCasaFotoPreview(null);}} className="absolute top-1 right-1 bg-destructive text-white rounded-full w-5 h-5 flex items-center justify-center text-xs">×</button></div>
+                    : <Button variant="outline" className="gap-2 h-16 border-dashed w-full" onClick={() => invCasaFileRef.current?.click()}><ImagePlus className="h-4 w-4" />Agregar foto</Button>
+                  }
+                </div>
+                <div className="grid gap-1.5"><Label className="text-xs">Notas</Label><Textarea value={invCasaForm.notas || ''} onChange={e => setInvCasaForm({...invCasaForm, notas: e.target.value})} rows={2} /></div>
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setInvCasaDialog(false)}>Cancelar</Button>
+                <Button onClick={async () => {
+                  if (!invCasaForm.nombre) { toast({ title: 'Nombre requerido', variant: 'destructive' }); return; }
+                  let foto_url = null;
+                  if (invCasaFotoFile) foto_url = await subirImagen('inventario-casa', invCasaFotoFile);
+                  await db.from('inventario_casa').insert({ ...invCasaForm, foto_url });
+                  reloadInvCasa(); setInvCasaDialog(false);
+                  toast({ title: '✅ Pieza agregada' });
+                }}>Guardar</Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+
+          {/* Confirm delete */}
+          <AlertDialog open={!!deleteInvCasaId} onOpenChange={() => setDeleteInvCasaId(null)}>
+            <AlertDialogContent>
+              <AlertDialogHeader><AlertDialogTitle>¿Eliminar pieza?</AlertDialogTitle><AlertDialogDescription>Esta acción no se puede deshacer.</AlertDialogDescription></AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                <AlertDialogAction onClick={async () => { await db.from('inventario_casa').delete().eq('id', deleteInvCasaId); setDeleteInvCasaId(null); reloadInvCasa(); toast({ title: 'Pieza eliminada' }); }}>Eliminar</AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </TabsContent>
 
         {/* ══════════════ MOVIMIENTOS ══════════════ */}
