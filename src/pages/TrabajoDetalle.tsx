@@ -49,7 +49,7 @@ export default function TrabajoDetalle() {
   const [bom, setBom]           = useState<any[]>([]);
   const [bomDialog, setBomDialog] = useState(false);
   const [bomForm, setBomForm]   = useState<any>({ descripcion: '', cantidad: 1, unidad: 'unidad', id_inventario: '', notas: '' });
-  const [inventario, setInventario] = useState<any[]>([]);
+  const [invBom, setInvBom] = useState<any[]>([]);
   const [bomSearch, setBomSearch] = useState('');
   const [ncfActivo,      setNcfActivo]      = useState(false);
   const [ncfNumero,      setNcfNumero]      = useState('');
@@ -80,7 +80,7 @@ export default function TrabajoDetalle() {
     const { data: bomData } = await db.from('trabajo_bom').select('*, inventario(nombre_item)').eq('id_trabajo', id).order('created_at');
     setBom(bomData || []);
     const { data: invData } = await db.from('inventario').select('id, nombre_item, stock_actual, unidad').order('nombre_item');
-    setInventario(invData || []);
+    setInvBom(invData || []);
   };
 
   useEffect(() => { reload(); }, [id]);
@@ -608,7 +608,7 @@ export default function TrabajoDetalle() {
                     <Input placeholder="Buscar..." value={bomSearch} onChange={e => setBomSearch(e.target.value)} className="h-7 text-xs" onClick={e => e.stopPropagation()} />
                   </div>
                   <SelectItem value="ninguno">— No está en inventario</SelectItem>
-                  {inventario.filter((i: any) => i.nombre_item?.toLowerCase().includes(bomSearch.toLowerCase())).map((i: any) => (
+                  {invBom.filter((i: any) => i.nombre_item?.toLowerCase().includes(bomSearch.toLowerCase())).map((i: any) => (
                     <SelectItem key={i.id} value={i.id}>{i.nombre_item} (stock: {i.stock_actual} {i.unidad})</SelectItem>
                   ))}
                 </SelectContent>
@@ -626,7 +626,7 @@ export default function TrabajoDetalle() {
         </DialogContent>
       </Dialog>
 
-      {/* ── DIALOG PAGO ── */}}
+      {/* ── DIALOG PAGO ── */}
       <Dialog open={pagoDialog} onOpenChange={setPagoDialog}>
         <DialogContent className="max-w-sm">
           <DialogHeader><DialogTitle>Registrar Pago</DialogTitle></DialogHeader>
