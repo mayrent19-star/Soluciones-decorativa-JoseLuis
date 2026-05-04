@@ -45,6 +45,12 @@ export default function TrabajoDetalle() {
   const [asigDialog, setAsigDialog] = useState(false);
   const [matDialog,  setMatDialog]  = useState(false);
   const [pagoDialog, setPagoDialog] = useState(false);
+  const [finalizarModal, setFinalizarModal] = useState<{estado: string} | null>(null);
+  const [bom, setBom]           = useState<any[]>([]);
+  const [bomDialog, setBomDialog] = useState(false);
+  const [bomForm, setBomForm]   = useState<any>({ descripcion: '', cantidad: 1, unidad: 'unidad', id_inventario: '', notas: '' });
+  const [inventario, setInventario] = useState<any[]>([]);
+  const [bomSearch, setBomSearch] = useState('');
   const [ncfActivo,      setNcfActivo]      = useState(false);
   const [ncfNumero,      setNcfNumero]      = useState('');
   const [garantiaActiva, setGarantiaActiva] = useState(false);
@@ -71,6 +77,10 @@ export default function TrabajoDetalle() {
     setMovCaja(caja); setEmpleados(emps); setInventario(inv);
     setPagos(pags || []);
     if ((t as any)?.id_cliente) setCliente(await fetchById('clientes', (t as any).id_cliente));
+    const { data: bomData } = await db.from('trabajo_bom').select('*, inventario(nombre_item)').eq('id_trabajo', id).order('created_at');
+    setBom(bomData || []);
+    const { data: invData } = await db.from('inventario').select('id, nombre_item, stock_actual, unidad').order('nombre_item');
+    setInventario(invData || []);
   };
 
   useEffect(() => { reload(); }, [id]);
@@ -89,8 +99,44 @@ export default function TrabajoDetalle() {
   const pendiente  = Math.max(0, montoTotal - totalPagos);
 
   const marcarFinalizado = async () => {
+    if (pendiente > 0) { setFinalizarModal({ estado: 'Finalizado' }); return; }
     await updateRow('trabajos', trabajo.id, { estado: 'Finalizado', fecha_finalizado: new Date().toISOString().slice(0, 10) });
     reload(); toast({ title: 'Trabajo finalizado' });
+  };
+
+  const confirmarFinalizar = async (conDeuda: boolean) => {
+    const updates: any = { estado: finalizarModal!.estado };
+    if (finalizarModal!.estado === 'Finalizado') updates.fecha_finalizado = new Date().toISOString().slice(0, 10);
+    await updateRow('trabajos', trabajo.id, updates);
+    setFinalizarModal(null);
+    reload();
+    if (conDeuda) toast({ title: '⚠️ Trabajo finalizado con saldo pendiente', variant: 'destructive' });
+    else toast({ title: '✅ Trabajo finalizado' });
+  };
+
+  const saveBom = async () => {
+    if (!bomForm.descripcion) { toast({ title: 'Descripción requerida', variant: 'destructive' }); return; }
+    await db.from('trabajo_bom').insert({
+      id_trabajo:    id,
+      descripcion:   bomForm.descripcion,
+      cantidad:      Number(bomForm.cantidad),
+      unidad:        bomForm.unidad,
+      id_inventario: bomForm.id_inventario || null,
+      notas:         bomForm.notas || null,
+      estado:        'Pendiente',
+    });
+    reload(); setBomDialog(false); setBomForm({ descripcion: '', cantidad: 1, unidad: 'unidad', id_inventario: '', notas: '' });
+    toast({ title: '✅ Material agregado a la lista' });
+  };
+
+  const updateBomEstado = async (bomId: string, estado: string) => {
+    await db.from('trabajo_bom').update({ estado }).eq('id', bomId);
+    reload();
+  };
+
+  const deleteBom = async (bomId: string) => {
+    await db.from('trabajo_bom').delete().eq('id', bomId);
+    reload();
   };
 
   const saveAsig = async () => {
@@ -291,6 +337,12 @@ export default function TrabajoDetalle() {
           <TabsTrigger value="asignaciones">👷 Empleados ({asignaciones.length})</TabsTrigger>
           <TabsTrigger value="materiales">📦 Materiales ({materiales.length})</TabsTrigger>
           <TabsTrigger value="caja">🏦 Caja ({movCaja.length})</TabsTrigger>
+          <TabsTrigger value="bom">
+            📋 Materiales ({bom.length})
+            {bom.filter((b: any) => b.estado === 'Pendiente').length > 0 && (
+              <span className="ml-1 w-2 h-2 rounded-full bg-amber-500 inline-block" />
+            )}
+          </TabsTrigger>
         </TabsList>
 
         {/* ══ PAGOS ══ */}
@@ -431,9 +483,150 @@ export default function TrabajoDetalle() {
             </TableBody></Table>
           </div>
         </TabsContent>
+        {/* ══ BOM — Materiales necesarios ══ */}
+        <TabsContent value="bom" className="mt-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs text-muted-foreground">Lista de materiales que se necesitan para este trabajo</p>
+            </div>
+            {isOwner && (
+              <Button size="sm" onClick={() => setBomDialog(true)} className="gap-1.5">
+                <Plus className="h-4 w-4" />Agregar material
+              </Button>
+            )}
+          </div>
+
+          {/* Resumen */}
+          {bom.length > 0 && (
+            <div className="grid grid-cols-3 gap-2">
+              {[{label:'Pendiente',color:'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300'},
+                {label:'Disponible',color:'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'},
+                {label:'Comprado',color:'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300'}].map(({label,color}) => (
+                <div key={label} className={`rounded-xl p-2 text-center ${color}`}>
+                  <p className="text-lg font-bold">{bom.filter((b: any) => b.estado === label).length}</p>
+                  <p className="text-xs">{label}</p>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {bom.length === 0 && (
+            <div className="border rounded-lg py-10 text-center text-muted-foreground bg-card">
+              <p className="text-sm">Sin materiales registrados</p>
+              <p className="text-xs mt-1">Agrega lo que el tapicero necesita antes de comprar</p>
+              {isOwner && <Button size="sm" variant="outline" className="mt-3" onClick={() => setBomDialog(true)}>Agregar primer material</Button>}
+            </div>
+          )}
+
+          <div className="space-y-2">
+            {bom.map((b: any) => {
+              const estadoColor: Record<string,string> = {
+                'Pendiente':  'bg-amber-100 text-amber-800 dark:bg-amber-900/30',
+                'Disponible': 'bg-green-100 text-green-800 dark:bg-green-900/30',
+                'Comprado':   'bg-blue-100 text-blue-800 dark:bg-blue-900/30',
+              };
+              return (
+                <div key={b.id} className="flex items-center gap-3 p-3 rounded-xl border bg-card">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="font-medium text-sm">{b.descripcion}</p>
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${estadoColor[b.estado]}`}>{b.estado}</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">{b.cantidad} {b.unidad}{b.inventario ? ` · En inventario: ${b.inventario.nombre_item}` : ''}{b.notas ? ` · ${b.notas}` : ''}</p>
+                  </div>
+                  {isOwner && (
+                    <div className="flex gap-1 shrink-0">
+                      {b.estado === 'Pendiente' && <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => updateBomEstado(b.id, 'Disponible')}>✓ Hay</Button>}
+                      {b.estado === 'Pendiente' && <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => updateBomEstado(b.id, 'Comprado')}>🛒 Comprado</Button>}
+                      {b.estado !== 'Pendiente' && <Button variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground" onClick={() => updateBomEstado(b.id, 'Pendiente')}>↩</Button>}
+                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => deleteBom(b.id)}><Trash2 className="h-3 w-3 text-destructive" /></Button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </TabsContent>
       </Tabs>
 
-      {/* ── DIALOG PAGO ── */}
+      {/* ── MODAL INTELIGENTE FINALIZAR ── */}
+      <AlertDialog open={!!finalizarModal} onOpenChange={() => setFinalizarModal(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <span className="text-2xl">⚠️</span> Hay saldo pendiente
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2 mt-2">
+                <p>Este trabajo tiene <span className="font-bold text-destructive">{formatCurrency(pendiente)}</span> sin cobrar.</p>
+                <p className="text-sm">¿Qué deseas hacer?</p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <Button variant="outline" className="gap-2" onClick={() => { setFinalizarModal(null); setPagoDialog(true); }}>
+              <DollarSign className="h-4 w-4" />Registrar pago primero
+            </Button>
+            <AlertDialogAction className="bg-destructive hover:bg-destructive/90" onClick={() => confirmarFinalizar(true)}>
+              Finalizar con deuda
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* ── DIALOG BOM ── */}
+      <Dialog open={bomDialog} onOpenChange={setBomDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>Agregar material necesario</DialogTitle></DialogHeader>
+          <div className="grid gap-4 py-2">
+            <div className="grid gap-1.5">
+              <Label className="text-xs">Material *</Label>
+              <Input placeholder="Ej: Tela, Dacron, Goma, Grapa..." value={bomForm.descripcion} onChange={e => setBomForm({...bomForm, descripcion: e.target.value})} />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="grid gap-1.5">
+                <Label className="text-xs">Cantidad</Label>
+                <Input type="number" min={0.1} step={0.1} value={bomForm.cantidad === 0 ? '' : bomForm.cantidad} onChange={e => setBomForm({...bomForm, cantidad: e.target.value === '' ? 0 : +e.target.value})} />
+              </div>
+              <div className="grid gap-1.5">
+                <Label className="text-xs">Unidad</Label>
+                <Select value={bomForm.unidad} onValueChange={v => setBomForm({...bomForm, unidad: v})}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {['unidad','metro','yarda','galón','caja','rollo','par','libra'].map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid gap-1.5">
+              <Label className="text-xs">¿Está en inventario? (opcional)</Label>
+              <Select value={bomForm.id_inventario || 'ninguno'} onValueChange={v => setBomForm({...bomForm, id_inventario: v === 'ninguno' ? '' : v})}>
+                <SelectTrigger><SelectValue placeholder="Buscar en inventario..." /></SelectTrigger>
+                <SelectContent>
+                  <div className="px-2 py-1 sticky top-0 bg-popover z-10">
+                    <Input placeholder="Buscar..." value={bomSearch} onChange={e => setBomSearch(e.target.value)} className="h-7 text-xs" onClick={e => e.stopPropagation()} />
+                  </div>
+                  <SelectItem value="ninguno">— No está en inventario</SelectItem>
+                  {inventario.filter((i: any) => i.nombre_item?.toLowerCase().includes(bomSearch.toLowerCase())).map((i: any) => (
+                    <SelectItem key={i.id} value={i.id}>{i.nombre_item} (stock: {i.stock_actual} {i.unidad})</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-1.5">
+              <Label className="text-xs">Notas (opcional)</Label>
+              <Input placeholder="Ej: media goma, color café..." value={bomForm.notas} onChange={e => setBomForm({...bomForm, notas: e.target.value})} />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setBomDialog(false)}>Cancelar</Button>
+            <Button onClick={saveBom}>Agregar</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── DIALOG PAGO ── */}}
       <Dialog open={pagoDialog} onOpenChange={setPagoDialog}>
         <DialogContent className="max-w-sm">
           <DialogHeader><DialogTitle>Registrar Pago</DialogTitle></DialogHeader>

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { DollarSign, Briefcase, Sunrise, Sunset } from 'lucide-react';
+import { DollarSign, Briefcase, Sunrise, Sunset, AlertTriangle, MapPin, Home, ShoppingBag } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { formatCurrency, formatDate } from '@/utils/helpers';
 import { useAuth } from '@/hooks/useAuth';
@@ -17,15 +17,25 @@ export default function Dashboard() {
   const [allCaja, setAllCaja] = useState<any[]>([]);
   const [cajaAbierta, setCajaAbierta] = useState(false);
 
+  const [pagos, setPagos]     = useState<any[]>([]);
+  const [invCasa, setInvCasa] = useState<any[]>([]);
+  const [clientes, setClientes] = useState<any[]>([]);
+
   const load = async () => {
-    const [{ data: t }, { data: c }, { data: estado }] = await Promise.all([
-      db.from('trabajos').select('*'),
+    const [{ data: t }, { data: c }, { data: estado }, { data: p }, { data: ic }, { data: cl }] = await Promise.all([
+      db.from('trabajos').select('*, clientes(nombre_completo)'),
       db.from('caja_movimientos').select('*'),
       db.from('caja_estado').select('*').limit(1).single(),
+      db.from('trabajo_pagos').select('*'),
+      db.from('inventario_casa').select('*').eq('estado', 'Listo para vender'),
+      db.from('clientes').select('id, nombre_completo'),
     ]);
     setTrabajos(t || []);
     setAllCaja(c || []);
     setCajaAbierta(estado?.abierta === true);
+    setPagos(p || []);
+    setInvCasa(ic || []);
+    setClientes(cl || []);
   };
 
   useEffect(() => { load(); }, []);
@@ -34,7 +44,33 @@ export default function Dashboard() {
   const ingresosHoy = cajaHoy.filter((m: any) => m.tipo === 'Entrada').reduce((s: number, m: any) => s + m.monto, 0);
   const gastosHoy = cajaHoy.filter((m: any) => m.tipo === 'Salida').reduce((s: number, m: any) => s + m.monto, 0);
   const balanceHoy = ingresosHoy - gastosHoy;
-  const enProceso = trabajos.filter((t: any) => t.estado === 'En proceso' || t.estado === 'Pendiente').length;
+  const enProceso = trabajos.filter((t: any) => t.estado === 'En proceso' || t.estado === 'Sin iniciar').length;
+
+  // Por cobrar — trabajos con saldo pendiente
+  const porCobrar = trabajos.filter((t: any) => !['Cancelado'].includes(t.estado)).reduce((s: number, t: any) => {
+    const monto = t.monto_final || t.monto_cotizado || 0;
+    const totalPagado = pagos.filter((p: any) => p.id_trabajo === t.id).reduce((ps: number, p: any) => ps + p.monto, 0);
+    const abono = t.abono || 0;
+    const pagado = Math.max(totalPagado, abono);
+    return s + Math.max(0, monto - pagado);
+  }, 0);
+
+  // Trabajos atrasados
+  const hoyDate = new Date(hoy);
+  const atrasados = trabajos.filter((t: any) => {
+    if (!t.fecha_entrega_estimada) return false;
+    if (['Entregado','Cancelado'].includes(t.estado)) return false;
+    return new Date(t.fecha_entrega_estimada) < hoyDate;
+  });
+
+  // Por local
+  const porLocal = {
+    calle8:   trabajos.filter((t: any) => !['Entregado','Cancelado'].includes(t.estado) && (t.local_trabajo === 'Local Calle 8' || !t.local_trabajo)).length,
+    mercedes: trabajos.filter((t: any) => !['Entregado','Cancelado'].includes(t.estado) && t.local_trabajo === 'Local Mercedes').length,
+  };
+
+  // De la casa activos
+  const delaCasa = trabajos.filter((t: any) => t.origen === 'De la casa' && !['Entregado','Cancelado'].includes(t.estado)).length;
 
   const estadoData = [
     { name: 'Pendiente', value: trabajos.filter((t: any) => t.estado === 'Pendiente').length },
@@ -58,12 +94,84 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* Alertas urgentes */}
+      {(atrasados.length > 0 || porCobrar > 0) && (
+        <div className="space-y-2">
+          {atrasados.length > 0 && (
+            <div className="flex items-center gap-3 p-3 rounded-xl border border-destructive/50 bg-destructive/5">
+              <AlertTriangle className="h-5 w-5 text-destructive shrink-0" />
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-destructive">{atrasados.length} trabajo{atrasados.length > 1 ? 's' : ''} atrasado{atrasados.length > 1 ? 's' : ''}</p>
+                <p className="text-xs text-muted-foreground">{atrasados.map((t: any) => t.clientes?.nombre_completo || t.nombre_libre || 'Sin cliente').join(', ')}</p>
+              </div>
+            </div>
+          )}
+          {porCobrar > 0 && (
+            <div className="flex items-center gap-3 p-3 rounded-xl border border-amber-500/50 bg-amber-50/50 dark:bg-amber-950/20">
+              <DollarSign className="h-5 w-5 text-amber-600 shrink-0" />
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-amber-700 dark:text-amber-400">Por cobrar: {formatCurrency(porCobrar)}</p>
+                <p className="text-xs text-muted-foreground">En trabajos activos y finalizados</p>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Stats principales */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <Card className="stat-card"><CardContent className="p-0"><div className="flex items-start justify-between"><div><p className="text-xs text-muted-foreground font-medium">Ingresos Hoy</p><p className="text-xl lg:text-2xl font-bold text-success mt-1">{formatCurrency(ingresosHoy)}</p></div><Sunrise className="h-5 w-5 text-success shrink-0" /></div></CardContent></Card>
         <Card className="stat-card"><CardContent className="p-0"><div className="flex items-start justify-between"><div><p className="text-xs text-muted-foreground font-medium">Gastos Hoy</p><p className="text-xl lg:text-2xl font-bold text-accent mt-1">{formatCurrency(gastosHoy)}</p></div><Sunset className="h-5 w-5 text-accent shrink-0" /></div></CardContent></Card>
         <Card className="stat-card"><CardContent className="p-0"><div className="flex items-start justify-between"><div><p className="text-xs text-muted-foreground font-medium">Balance Hoy</p><p className={`text-xl lg:text-2xl font-bold mt-1 ${balanceHoy >= 0 ? 'text-success' : 'text-destructive'}`}>{formatCurrency(balanceHoy)}</p></div><DollarSign className="h-5 w-5 text-primary shrink-0" /></div></CardContent></Card>
         <Card className="stat-card"><CardContent className="p-0"><div className="flex items-start justify-between"><div><p className="text-xs text-muted-foreground font-medium">Trabajos Activos</p><p className="text-xl lg:text-2xl font-bold mt-1">{enProceso}</p></div><Briefcase className="h-5 w-5 text-primary shrink-0" /></div></CardContent></Card>
       </div>
+
+      {/* Trabajos por local */}
+      <div className="grid grid-cols-3 gap-3">
+        <Card className="stat-card">
+          <CardContent className="p-0">
+            <div className="flex items-start justify-between">
+              <div><p className="text-xs text-muted-foreground font-medium">Local Calle 8</p><p className="text-2xl font-bold mt-1">{porLocal.calle8}</p><p className="text-xs text-muted-foreground">trabajos</p></div>
+              <MapPin className="h-5 w-5 text-blue-500 shrink-0" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="stat-card">
+          <CardContent className="p-0">
+            <div className="flex items-start justify-between">
+              <div><p className="text-xs text-muted-foreground font-medium">Local Mercedes</p><p className="text-2xl font-bold mt-1">{porLocal.mercedes}</p><p className="text-xs text-muted-foreground">trabajos</p></div>
+              <MapPin className="h-5 w-5 text-purple-500 shrink-0" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="stat-card">
+          <CardContent className="p-0">
+            <div className="flex items-start justify-between">
+              <div><p className="text-xs text-muted-foreground font-medium">De la casa</p><p className="text-2xl font-bold mt-1 text-orange-600">{delaCasa}</p><p className="text-xs text-muted-foreground">en proceso</p></div>
+              <Home className="h-5 w-5 text-orange-500 shrink-0" />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Inventario casa listo para vender */}
+      {invCasa.length > 0 && (
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <ShoppingBag className="h-4 w-4 text-green-600" />
+              <h3 className="text-sm font-semibold">{invCasa.length} pieza{invCasa.length > 1 ? 's' : ''} lista{invCasa.length > 1 ? 's' : ''} para vender</h3>
+            </div>
+            <div className="flex gap-2 flex-wrap">
+              {invCasa.map((p: any) => (
+                <span key={p.id} className="text-xs px-2.5 py-1 rounded-full bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300 font-medium">
+                  {p.nombre}
+                </span>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <Card><CardContent className="p-5">
         <h3 className="text-sm font-semibold mb-4">📋 Flujo de Caja del Día</h3>

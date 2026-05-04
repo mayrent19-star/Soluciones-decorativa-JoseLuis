@@ -76,7 +76,7 @@ const empty = {
   fotos_antes: [] as string[], fotos_despues: [] as string[],
   foto_muestra: '' as string, foto_final: '' as string, notas: '',
   nombre_libre: '', rnc_libre: '',
-  origen: 'Cliente', local_trabajo: 'Principal'
+  origen: 'Cliente', local_trabajo: 'Local Calle 8'
 };
 
 function safeNumber(n: any) { const v = Number(n); return Number.isFinite(v) ? v : null; }
@@ -523,7 +523,7 @@ export default function Trabajos() {
                 <Select value={form.local_trabajo || 'Principal'} onValueChange={v => setForm({ ...form, local_trabajo: v })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Principal">Principal</SelectItem>
+                    <SelectItem value="Local Calle 8">Local Calle 8</SelectItem>
                     <SelectItem value="Local Mercedes">Local Mercedes</SelectItem>
                   </SelectContent>
                 </Select>
