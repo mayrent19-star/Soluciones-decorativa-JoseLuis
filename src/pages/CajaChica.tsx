@@ -35,6 +35,8 @@ export default function CajaChica() {
   const [desde,     setDesde]     = useState('');
   const [hasta,     setHasta]     = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [cajaTrabajoSearch, setCajaTrabajoSearch] = useState('');
+  const [cajaEmpleadoSearch, setCajaEmpleadoSearch] = useState('');
   const [form,      setForm]      = useState<any>(emptyMov);
 
   // ── Estado caja ──
@@ -428,15 +430,33 @@ export default function CajaChica() {
             <div className="grid gap-1.5">
               <Label className="text-xs">Trabajo (opcional)</Label>
               <Select value={form.id_trabajo || 'ninguno'} onValueChange={v => setForm({ ...form, id_trabajo: v === 'ninguno' ? null : v })}>
-                <SelectTrigger><SelectValue placeholder="Seleccionar trabajo" /></SelectTrigger>
-                <SelectContent><SelectItem value="ninguno">Ninguno</SelectItem>{trabajos.map(t => <SelectItem key={t.id} value={t.id}>{t.descripcion_trabajo}</SelectItem>)}</SelectContent>
+                <SelectTrigger><SelectValue placeholder="Buscar trabajo..." /></SelectTrigger>
+                <SelectContent>
+                  <div className="px-2 py-1 sticky top-0 bg-popover z-10">
+                    <Input placeholder="Buscar..." value={cajaTrabajoSearch} onChange={e => setCajaTrabajoSearch(e.target.value)}
+                      className="h-7 text-xs" onClick={e => e.stopPropagation()} />
+                  </div>
+                  <SelectItem value="ninguno">Ninguno</SelectItem>
+                  {trabajos
+                    .filter(t => t.descripcion_trabajo?.toLowerCase().includes(cajaTrabajoSearch.toLowerCase()))
+                    .map(t => <SelectItem key={t.id} value={t.id}>{t.descripcion_trabajo}</SelectItem>)}
+                </SelectContent>
               </Select>
             </div>
             <div className="grid gap-1.5">
               <Label className="text-xs">Empleado (opcional)</Label>
               <Select value={form.id_empleado || 'ninguno'} onValueChange={v => setForm({ ...form, id_empleado: v === 'ninguno' ? null : v })}>
-                <SelectTrigger><SelectValue placeholder="Seleccionar empleado" /></SelectTrigger>
-                <SelectContent><SelectItem value="ninguno">Ninguno</SelectItem>{empleados.map(e => <SelectItem key={e.id} value={e.id}>{e.nombre}</SelectItem>)}</SelectContent>
+                <SelectTrigger><SelectValue placeholder="Buscar empleado..." /></SelectTrigger>
+                <SelectContent>
+                  <div className="px-2 py-1 sticky top-0 bg-popover z-10">
+                    <Input placeholder="Buscar..." value={cajaEmpleadoSearch} onChange={e => setCajaEmpleadoSearch(e.target.value)}
+                      className="h-7 text-xs" onClick={e => e.stopPropagation()} />
+                  </div>
+                  <SelectItem value="ninguno">Ninguno</SelectItem>
+                  {empleados
+                    .filter(e => e.nombre?.toLowerCase().includes(cajaEmpleadoSearch.toLowerCase()))
+                    .map(e => <SelectItem key={e.id} value={e.id}>{e.nombre}</SelectItem>)}
+                </SelectContent>
               </Select>
             </div>
           </div>

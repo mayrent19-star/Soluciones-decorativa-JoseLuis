@@ -20,7 +20,7 @@ import { registrarAuditoria } from '@/hooks/useAuditoria';
 const db = supabase as any;
 
 // ── Materia prima ──────────────────────────────────────────────
-const categorias  = ['Tela', 'Madera', 'Espuma', 'Pegamento', 'Herramienta', 'Acabado', 'Otro'];
+const categorias  = ['Tela', 'Madera', 'Espuma', 'Pegamento', 'Herramienta', 'Acabado', 'Goma molida', 'Otro'];
 const skuPrefijo: Record<string, string> = {
   'Tela': 'TEL', 'Madera': 'MAD', 'Espuma': 'ESP',
   'Pegamento': 'PEG', 'Herramienta': 'HER', 'Acabado': 'ACA', 'Otro': 'OTR',
@@ -110,7 +110,7 @@ export default function Inventario() {
   // ── Estado: inventario casa ──
   const [invCasa, setInvCasa]           = useState<any[]>([]);
   const [invCasaDialog, setInvCasaDialog] = useState(false);
-  const [invCasaForm, setInvCasaForm]   = useState<any>({ nombre: '', descripcion: '', tipo: 'Estructura', estado: 'Sin terminar', ubicacion: 'Local Mercedes', notas: '' });
+  const [invCasaForm, setInvCasaForm]   = useState<any>({ nombre: '', descripcion: '', tipo: 'Estructura', estado: 'Sin terminar', ubicacion: 'Taller', notas: '', ancho: '', largo: '', profundidad: '', unidad_medida: 'pulgadas' });
   const [invCasaFotoFile, setInvCasaFotoFile] = useState<File | null>(null);
   const [invCasaFotoPreview, setInvCasaFotoPreview] = useState<string | null>(null);
   const [deleteInvCasaId, setDeleteInvCasaId] = useState<string | null>(null);
@@ -419,6 +419,9 @@ export default function Inventario() {
                     {isOwner && (
                       <TableCell>
                         <div className="flex gap-1">
+                          <Button variant="ghost" size="icon" title="Mover a Inventario Casa" onClick={() => setMoverItemDialog(i)}>
+                            <span className="text-sm">🏠</span>
+                          </Button>
                           <Button variant="ghost" size="icon" onClick={() => openEditItem(i)}><Pencil className="h-4 w-4" /></Button>
                           <Button variant="ghost" size="icon" onClick={() => setDeleteId(i.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
                         </div>
@@ -548,6 +551,11 @@ export default function Inventario() {
                     <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${estadoColor[p.estado]}`}>{p.estado}</span>
                     {p.descripcion && <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{p.descripcion}</p>}
                     <p className="text-xs text-muted-foreground mt-1">{p.ubicacion} · {p.tipo}</p>
+                    {(p.largo || p.ancho || p.profundidad) && (
+                      <p className="text-xs text-blue-600 dark:text-blue-400 mt-0.5">
+                        📐 {[p.largo, p.ancho, p.profundidad].filter(Boolean).join(' × ')} {p.unidad_medida || 'pulgadas'}
+                      </p>
+                    )}
                     {isOwner && p.estado !== 'Vendido' && (
                       <div className="mt-2 flex gap-1 flex-wrap">
                         {['Sin terminar','En proceso','Listo para vender'].filter(e => e !== p.estado).map(sig => (
@@ -659,11 +667,43 @@ export default function Inventario() {
                   <Select value={invCasaForm.ubicacion} onValueChange={v => setInvCasaForm({...invCasaForm, ubicacion: v})}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      {['Principal','Local Mercedes','Almacén Casa','Almacén Taller'].map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+                      {['Taller','Local Calle 8','Local Mercedes','Almacén Casa','Almacén Taller'].map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="grid gap-1.5"><Label className="text-xs">Descripción</Label><Textarea value={invCasaForm.descripcion || ''} onChange={e => setInvCasaForm({...invCasaForm, descripcion: e.target.value})} rows={2} placeholder="Madera de caoba, sin tapizar, espalda de 1.20m..." /></div>
+                {/* Medidas opcionales */}
+                <div className="grid gap-1.5">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs">Medidas (opcional)</Label>
+                    <Select value={invCasaForm.unidad_medida} onValueChange={v => setInvCasaForm({...invCasaForm, unidad_medida: v})}>
+                      <SelectTrigger className="h-7 w-28 text-xs"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="pulgadas">Pulgadas</SelectItem>
+                        <SelectItem value="centimetros">Centímetros</SelectItem>
+                        <SelectItem value="metros">Metros</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="grid gap-1">
+                      <Label className="text-xs text-muted-foreground">Largo</Label>
+                      <Input type="number" min={0} placeholder="0" value={invCasaForm.largo || ''} onChange={e => setInvCasaForm({...invCasaForm, largo: e.target.value})} className="h-8 text-sm" />
+                    </div>
+                    <div className="grid gap-1">
+                      <Label className="text-xs text-muted-foreground">Ancho</Label>
+                      <Input type="number" min={0} placeholder="0" value={invCasaForm.ancho || ''} onChange={e => setInvCasaForm({...invCasaForm, ancho: e.target.value})} className="h-8 text-sm" />
+                    </div>
+                    <div className="grid gap-1">
+                      <Label className="text-xs text-muted-foreground">Profundidad</Label>
+                      <Input type="number" min={0} placeholder="0" value={invCasaForm.profundidad || ''} onChange={e => setInvCasaForm({...invCasaForm, profundidad: e.target.value})} className="h-8 text-sm" />
+                    </div>
+                  </div>
+                  {(invCasaForm.largo || invCasaForm.ancho || invCasaForm.profundidad) && (
+                    <p className="text-xs text-muted-foreground">{[invCasaForm.largo,invCasaForm.ancho,invCasaForm.profundidad].filter(Boolean).join(' × ')} {invCasaForm.unidad_medida}</p>
+                  )}
+                </div>
+
                 <div className="grid gap-1.5">
                   <Label className="text-xs">Foto (opcional)</Label>
                   <input ref={invCasaFileRef} type="file" accept="image/*" className="hidden" onChange={e => { const f = e.target.files?.[0]; if(f){ setInvCasaFotoFile(f); setInvCasaFotoPreview(URL.createObjectURL(f)); }}} />
@@ -680,7 +720,13 @@ export default function Inventario() {
                   if (!invCasaForm.nombre) { toast({ title: 'Nombre requerido', variant: 'destructive' }); return; }
                   let foto_url = null;
                   if (invCasaFotoFile) foto_url = await subirImagen('inventario-casa', invCasaFotoFile);
-                  await db.from('inventario_casa').insert({ ...invCasaForm, foto_url });
+                  await db.from('inventario_casa').insert({
+                    ...invCasaForm,
+                    foto_url,
+                    largo:       invCasaForm.largo ? Number(invCasaForm.largo) : null,
+                    ancho:       invCasaForm.ancho ? Number(invCasaForm.ancho) : null,
+                    profundidad: invCasaForm.profundidad ? Number(invCasaForm.profundidad) : null,
+                  });
                   reloadInvCasa(); setInvCasaDialog(false);
                   toast({ title: '✅ Pieza agregada' });
                 }}>Guardar</Button>

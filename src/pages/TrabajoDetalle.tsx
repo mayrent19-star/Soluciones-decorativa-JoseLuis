@@ -168,11 +168,22 @@ export default function TrabajoDetalle() {
     } else {
       payload.id_item = matForm.id_item;
     }
+    payload.sobrante = Number(matForm.sobrante) || 0;
+    payload.devuelto_inventario = false;
     await insertRow('trabajo_materiales', payload);
+
+    // Si es tela y hay sobrante, devolver al inventario
+    if (!matForm.es_libre && matForm.id_item && payload.sobrante > 0) {
+      const item = inventario.find((i: any) => i.id === matForm.id_item);
+      if (item && item.categoria === 'Tela') {
+        await updateRow('inventario', matForm.id_item, { stock_actual: (item.stock_actual || 0) + payload.sobrante });
+        await db.from('trabajo_materiales').update({ devuelto_inventario: true }).eq('id_trabajo', id).eq('id_item', matForm.id_item).order('created_at', { ascending: false }).limit(1);
+      }
+    }
     reload(); setMatDialog(false);
-    setMatForm({ id_item: '', descripcion_libre: '', cantidad: 1, costo_unitario: 0, es_libre: false });
+    setMatForm({ id_item: '', descripcion_libre: '', cantidad: 1, costo_unitario: 0, es_libre: false, sobrante: 0 });
     setMatSearch('');
-    toast({ title: 'Material agregado' });
+    toast({ title: 'Material registrado' });
   };
 
   const moverACasa = async () => {
@@ -361,6 +372,16 @@ export default function TrabajoDetalle() {
             <div><span className="text-xs text-muted-foreground">Entrega estimada</span><p>{trabajo.fecha_entrega_estimada ? formatDate(trabajo.fecha_entrega_estimada) : '—'}</p></div>
             <div><span className="text-xs text-muted-foreground">Categoría</span><p>{trabajo.categoria}</p></div>
             <div><span className="text-xs text-muted-foreground">Tipo</span><p>{trabajo.tipo_trabajo || '—'}</p></div>
+            <div><span className="text-xs text-muted-foreground">Local</span><p>{trabajo.local_trabajo || '—'}</p></div>
+            <div><span className="text-xs text-muted-foreground">Origen</span><p>{trabajo.origen || 'Cliente'}</p></div>
+            {(trabajo.medida_largo || trabajo.medida_ancho || trabajo.medida_profundidad) && (
+              <div className="col-span-2">
+                <span className="text-xs text-muted-foreground">Medidas del mueble</span>
+                <p className="text-sm font-medium text-blue-600 dark:text-blue-400">
+                  📐 {[trabajo.medida_largo, trabajo.medida_ancho, trabajo.medida_profundidad].filter(Boolean).join(' × ')} pulgadas
+                </p>
+              </div>
+            )}
             {trabajo.notas && <div className="col-span-2"><span className="text-xs text-muted-foreground">Notas</span><p>{trabajo.notas}</p></div>}
           </div>
         </CardContent>
@@ -373,10 +394,10 @@ export default function TrabajoDetalle() {
             {pendiente > 0 && <span className="ml-1.5 w-2 h-2 rounded-full bg-destructive inline-block" />}
           </TabsTrigger>
           <TabsTrigger value="asignaciones">👷 Empleados ({asignaciones.length})</TabsTrigger>
-          <TabsTrigger value="materiales">📦 Materiales ({materiales.length})</TabsTrigger>
+          <TabsTrigger value="materiales">💰 Gastos ({materiales.length})</TabsTrigger>
           <TabsTrigger value="caja">🏦 Caja ({movCaja.length})</TabsTrigger>
           <TabsTrigger value="bom">
-            📋 Materiales ({bom.length})
+            📋 Ficha ({bom.length})
             {bom.filter((b: any) => b.estado === 'Pendiente').length > 0 && (
               <span className="ml-1 w-2 h-2 rounded-full bg-amber-500 inline-block" />
             )}
@@ -487,16 +508,29 @@ export default function TrabajoDetalle() {
               {isOwner && <TableHead className="w-[50px]" />}
             </TableRow></TableHeader>
             <TableBody>
-              {materiales.length === 0 && <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-6">Sin materiales</TableCell></TableRow>}
-              {materiales.map((m: any) => (
-                <TableRow key={m.id}>
-                  <TableCell className="font-medium">{inventario.find((i: any) => i.id === m.id_item)?.nombre_item || '—'}</TableCell>
-                  <TableCell className="text-right">{m.cantidad}</TableCell>
-                  <TableCell className="text-right">{formatCurrency(m.costo_unitario)}</TableCell>
-                  <TableCell className="text-right font-medium">{formatCurrency(m.costo_total || m.cantidad * m.costo_unitario)}</TableCell>
-                  {isOwner && <TableCell><Button variant="ghost" size="icon" onClick={async () => { await deleteRow('trabajo_materiales', m.id); reload(); }}><Trash2 className="h-4 w-4 text-destructive" /></Button></TableCell>}
-                </TableRow>
-              ))}
+              {materiales.length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-6">Sin materiales</TableCell></TableRow>}
+              {materiales.map((m: any) => {
+                const nombre = m.descripcion_libre || inventario.find((i: any) => i.id === m.id_item)?.nombre_item || '—';
+                return (
+                  <TableRow key={m.id}>
+                    <TableCell className="font-medium">
+                      {nombre}
+                      {m.descripcion_libre && <span className="text-xs text-muted-foreground ml-1">(libre)</span>}
+                    </TableCell>
+                    <TableCell className="text-right">{m.cantidad}</TableCell>
+                    <TableCell className="text-right">{formatCurrency(m.costo_unitario)}</TableCell>
+                    <TableCell className="text-right font-medium">{formatCurrency(m.costo_total || m.cantidad * m.costo_unitario)}</TableCell>
+                    <TableCell className="text-right text-xs text-muted-foreground">
+                      {m.sobrante > 0 ? (
+                        <span className={m.devuelto_inventario ? 'text-green-600' : 'text-amber-600'}>
+                          {m.sobrante} sobra{m.devuelto_inventario ? ' ✅' : ''}
+                        </span>
+                      ) : '—'}
+                    </TableCell>
+                    {isOwner && <TableCell><Button variant="ghost" size="icon" onClick={async () => { await deleteRow('trabajo_materiales', m.id); reload(); }}><Trash2 className="h-4 w-4 text-destructive" /></Button></TableCell>}
+                  </TableRow>
+                );
+              })}
             </TableBody></Table>
           </div>
         </TabsContent>
@@ -525,13 +559,47 @@ export default function TrabajoDetalle() {
         <TabsContent value="bom" className="mt-4 space-y-3">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-xs text-muted-foreground">Lista de materiales que se necesitan para este trabajo</p>
+              <p className="text-xs text-muted-foreground">Control de materiales entregados al empleado</p>
             </div>
-            {isOwner && (
-              <Button size="sm" onClick={() => setBomDialog(true)} className="gap-1.5">
-                <Plus className="h-4 w-4" />Agregar material
+            <div className="flex gap-2">
+              <Button size="sm" variant="outline" onClick={() => {
+                const empleado = asignaciones[0] ? empleados.find((e: any) => e.id === asignaciones[0].id_empleado)?.nombre || '—' : '—';
+                const medidas = [trabajo.medida_largo, trabajo.medida_ancho, trabajo.medida_profundidad].filter(Boolean).join(' × ');
+                const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Ficha de Trabajo</title>
+                <style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Segoe UI',sans-serif;padding:30px;max-width:700px;margin:auto;color:#1a1a1a}.header{border-bottom:3px solid #185FA5;padding-bottom:15px;margin-bottom:20px}.title{color:#185FA5;font-size:20px;font-weight:700}.info{display:grid;grid-template-columns:1fr 1fr;gap:8px 20px;margin:15px 0}.field{font-size:12px}.field label{color:#888;display:block;font-size:10px}table{width:100%;border-collapse:collapse;margin:15px 0}th{background:#185FA5;color:white;padding:8px;font-size:11px;text-align:left}td{padding:8px;border-bottom:1px solid #eee;font-size:12px}.firma{margin-top:40px;display:grid;grid-template-columns:1fr 1fr;gap:40px}.firma-box{border-top:1px solid #333;padding-top:8px;text-align:center;font-size:11px;color:#666}</style></head><body>
+                <div class="header"><div class="title">📋 Ficha de Trabajo</div><div style="font-size:11px;color:#666;margin-top:4px">Soluciones Decorativas José Luis</div></div>
+                <div class="info">
+                  <div class="field"><label>Descripción del trabajo</label><strong>${trabajo.descripcion_trabajo}</strong></div>
+                  <div class="field"><label>Empleado asignado</label><strong>${empleado}</strong></div>
+                  <div class="field"><label>Fecha inicio</label>${formatDate(trabajo.fecha_inicio)}</div>
+                  <div class="field"><label>Entrega estimada</label>${trabajo.fecha_entrega_estimada ? formatDate(trabajo.fecha_entrega_estimada) : '—'}</div>
+                  ${medidas ? `<div class="field"><label>Medidas del mueble</label><strong>${medidas} pulgadas</strong></div>` : ''}
+                  <div class="field"><label>Local</label>${trabajo.local_trabajo || '—'}</div>
+                </div>
+                <table><thead><tr><th>Material entregado</th><th>Cantidad</th><th>Unidad</th><th>Usado</th><th>Sobrante</th></tr></thead>
+                <tbody>${bom.map((b: any) => `<tr><td>${b.descripcion}</td><td>${b.cantidad}</td><td>${b.unidad}</td><td style="color:#ccc">______</td><td style="color:#ccc">______</td></tr>`).join('')}
+                <tr><td style="color:#ccc;font-style:italic">___________________</td><td></td><td></td><td></td><td></td></tr>
+                <tr><td style="color:#ccc;font-style:italic">___________________</td><td></td><td></td><td></td><td></td></tr>
+                </tbody></table>
+                <div style="margin-top:15px;padding:10px;background:#f9f9f9;border-radius:6px;font-size:11px;color:#666">
+                  <strong>Notas:</strong> ${trabajo.notas || '—'}
+                </div>
+                <div class="firma">
+                  <div class="firma-box">Entregado por</div>
+                  <div class="firma-box">Recibido por (Empleado)</div>
+                </div>
+                </body></html>`;
+                const w = window.open('', '_blank', 'width=800,height=600');
+                if (w) { w.document.write(html); w.document.close(); setTimeout(() => w.print(), 500); }
+              }} className="gap-1.5 text-xs">
+                🖨️ Imprimir ficha
               </Button>
-            )}
+              {isOwner && (
+                <Button size="sm" onClick={() => setBomDialog(true)} className="gap-1.5">
+                  <Plus className="h-4 w-4" />Agregar
+                </Button>
+              )}
+            </div>
           </div>
 
           {/* Resumen */}
@@ -877,6 +945,19 @@ export default function TrabajoDetalle() {
                   value={matForm.costo_unitario === 0 ? '' : matForm.costo_unitario}
                   onChange={e => setMatForm({...matForm, costo_unitario: e.target.value === '' ? 0 : +e.target.value})} />
               </div>
+            </div>
+
+            {/* Sobrante */}
+            <div className="grid gap-1.5">
+              <Label className="text-xs">
+                Sobrante {!matForm.es_libre && inventario.find((i: any) => i.id === matForm.id_item)?.categoria === 'Tela' ?
+                  <span className="text-green-600 ml-1">· Tela: se devuelve al inventario automáticamente</span> :
+                  <span className="text-muted-foreground ml-1">(opcional)</span>
+                }
+              </Label>
+              <Input type="number" min={0} step={0.1} placeholder="0"
+                value={matForm.sobrante === 0 ? '' : matForm.sobrante}
+                onChange={e => setMatForm({...matForm, sobrante: e.target.value === '' ? 0 : +e.target.value})} />
             </div>
 
             {/* Total */}
