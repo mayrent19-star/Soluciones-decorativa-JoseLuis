@@ -762,7 +762,7 @@ export default function TrabajoDetalle() {
         </DialogContent>
       </Dialog>
 
-      {/* ── MODAL INTELIGENTE FINALIZAR ── */}}
+      {/* ── MODAL INTELIGENTE FINALIZAR ── */}
       <AlertDialog open={!!finalizarModal} onOpenChange={() => setFinalizarModal(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
