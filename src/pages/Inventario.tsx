@@ -25,7 +25,7 @@ const skuPrefijo: Record<string, string> = {
   'Tela': 'TEL', 'Madera': 'MAD', 'Espuma': 'ESP',
   'Pegamento': 'PEG', 'Herramienta': 'HER', 'Acabado': 'ACA', 'Otro': 'OTR',
 };
-const ubicaciones = ['Almacén Casa', 'Local Mercede', 'Local Calle 8', 'Telas', 'Almacén Taller'];
+const ubicaciones = ['Almacén Casa', 'Local Mercedes', 'Local Calle 8', 'Telas', 'Almacén Taller'];
 const unidades    = ['unidad', 'yarda', 'metro', 'pie', 'galón', 'plancha', 'caja', 'rollo'];
 const emptyItem  = { nombre_item: '', categoria: 'Tela', unidad: 'unidad', stock_actual: null as number | null, stock_minimo: null as number | null, costo_unitario: 0, ubicacion: '' };
 const emptyMov   = { id_item: '', tipo_movimiento: 'Entrada', cantidad: 0, motivo: '', fecha: new Date().toISOString().slice(0, 10), id_trabajo: null, asignado_a: '' };
@@ -92,6 +92,7 @@ export default function Inventario() {
   const [fotoPreview, setFotoPreview] = useState<string | null>(null);
   const [fotoDialog, setFotoDialog] = useState<any>(null);
   const [movSearch, setMovSearch] = useState('');
+  const [moverItemDialog, setMoverItemDialog] = useState<any>(null); // artículo a mover a inv casa
   const [movFiltro, setMovFiltro] = useState<'hoy'|'semana'|'mes'|'todos'>('mes');
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -548,13 +549,24 @@ export default function Inventario() {
                     {p.descripcion && <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{p.descripcion}</p>}
                     <p className="text-xs text-muted-foreground mt-1">{p.ubicacion} · {p.tipo}</p>
                     {isOwner && p.estado !== 'Vendido' && (
-                      <div className="mt-2 flex gap-1">
+                      <div className="mt-2 flex gap-1 flex-wrap">
                         {['Sin terminar','En proceso','Listo para vender'].filter(e => e !== p.estado).map(sig => (
                           <button key={sig} onClick={async () => { await db.from('inventario_casa').update({ estado: sig }).eq('id', p.id); reloadInvCasa(); }}
                             className="text-xs px-2 py-0.5 rounded border hover:bg-secondary transition-colors">
                             → {sig === 'Listo para vender' ? 'Listo' : sig}
                           </button>
                         ))}
+                        <button onClick={() => {
+                          const desc = encodeURIComponent(p.nombre);
+                          window.location.href = `/trabajos?desde_casa=${p.id}&nombre=${desc}`;
+                        }} className="text-xs px-2 py-0.5 rounded border border-blue-300 text-blue-700 hover:bg-blue-50 transition-colors">
+                          🔨 Crear trabajo
+                        </button>
+                        <button onClick={() => {
+                          window.location.href = `/ventas?desde_casa=${p.id}&nombre=${encodeURIComponent(p.nombre)}`;
+                        }} className="text-xs px-2 py-0.5 rounded border border-green-300 text-green-700 hover:bg-green-50 transition-colors">
+                          💰 Vender
+                        </button>
                       </div>
                     )}
                   </div>
@@ -563,7 +575,60 @@ export default function Inventario() {
             })}
           </div>
 
-          {/* Dialog agregar pieza */}
+          {/* ── DIALOG MOVER ARTÍCULO A INV CASA ── */}
+      {moverItemDialog && (
+        <Dialog open={!!moverItemDialog} onOpenChange={() => setMoverItemDialog(null)}>
+          <DialogContent className="max-w-sm">
+            <DialogHeader><DialogTitle>🏠 Mover a Inventario Casa</DialogTitle></DialogHeader>
+            <div className="grid gap-4 py-2">
+              <div className="p-3 rounded-lg bg-secondary/50 text-sm">
+                <p className="font-medium">{moverItemDialog.nombre_item}</p>
+                <p className="text-xs text-muted-foreground">Stock actual: {moverItemDialog.stock_actual} {moverItemDialog.unidad}</p>
+              </div>
+              <p className="text-sm text-muted-foreground">Este artículo pasará a Inventario Casa como pieza del dueño. Indica cuántas unidades mover:</p>
+              <div className="grid gap-1.5">
+                <Label className="text-xs">Cantidad a mover</Label>
+                <Input type="number" min={1} max={moverItemDialog.stock_actual}
+                  defaultValue={1} id="mover-cantidad"
+                  onChange={e => setMoverItemDialog({...moverItemDialog, _cantidad: +e.target.value})} />
+              </div>
+              <div className="grid gap-1.5">
+                <Label className="text-xs">Nombre en Inventario Casa</Label>
+                <Input defaultValue={moverItemDialog.nombre_item} id="mover-nombre"
+                  onChange={e => setMoverItemDialog({...moverItemDialog, _nombre: e.target.value})} />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setMoverItemDialog(null)}>Cancelar</Button>
+              <Button className="bg-orange-600 hover:bg-orange-700" onClick={async () => {
+                const cantidad = moverItemDialog._cantidad || 1;
+                const nombre   = moverItemDialog._nombre || moverItemDialog.nombre_item;
+                // Crear en inventario casa
+                await db.from('inventario_casa').insert({
+                  nombre, descripcion: `Movido desde materia prima: ${moverItemDialog.nombre_item}`,
+                  tipo: 'Otro', estado: 'Sin terminar', ubicacion: moverItemDialog.ubicacion || 'Taller',
+                });
+                // Registrar salida en movimientos
+                await insertRow('inventario_movimientos', {
+                  id_item: moverItemDialog.id,
+                  tipo_movimiento: 'Salida',
+                  cantidad,
+                  motivo: 'Movido a Inventario Casa',
+                  fecha: new Date().toISOString().slice(0, 10),
+                });
+                // Actualizar stock
+                await updateRow('inventario', moverItemDialog.id, {
+                  stock_actual: Math.max(0, (moverItemDialog.stock_actual || 0) - cantidad)
+                });
+                setMoverItemDialog(null); reload(); reloadInvCasa();
+                toast({ title: '✅ Artículo movido a Inventario Casa' });
+              }}>Mover</Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Dialog agregar pieza */}}
           <Dialog open={invCasaDialog} onOpenChange={setInvCasaDialog}>
             <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
               <DialogHeader><DialogTitle>Nueva pieza — Inventario Casa</DialogTitle></DialogHeader>

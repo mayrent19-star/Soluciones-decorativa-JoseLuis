@@ -57,7 +57,12 @@ export default function TrabajoDetalle() {
   const [garantiaActiva, setGarantiaActiva] = useState(false);
   const [garantiaTexto,  setGarantiaTexto]  = useState('');
   const [asigForm, setAsigForm] = useState<any>({});
-  const [matForm,  setMatForm]  = useState<any>({ id_item: '', cantidad: 1, costo_unitario: 0 });
+  const [matForm,  setMatForm]  = useState<any>({ id_item: '', descripcion_libre: '', cantidad: 1, costo_unitario: 0, es_libre: false });
+  const [matSearch, setMatSearch] = useState('');
+  const [asigSearch, setAsigSearch] = useState('');
+  // Para mover trabajo a inventario casa
+  const [moverCasaDialog, setMoverCasaDialog] = useState(false);
+  const [moverCasaForm, setMoverCasaForm] = useState<any>({ nombre: '', descripcion: '', tipo: 'Estructura', estado: 'Sin terminar', ubicacion: 'Local Mercedes' });
   const [pagoForm, setPagoForm] = useState<any>({
     monto: '', metodo: 'Efectivo',
     fecha: new Date().toISOString().slice(0, 10), notas: ''
@@ -148,10 +153,42 @@ export default function TrabajoDetalle() {
   };
 
   const saveMat = async () => {
-    if (!matForm.id_item) { toast({ title: 'Selecciona un material', variant: 'destructive' }); return; }
-    await insertRow('trabajo_materiales', { ...matForm, id_trabajo: id });
-    reload(); setMatDialog(false); setMatForm({ id_item: '', cantidad: 1, costo_unitario: 0 });
+    if (!matForm.es_libre && !matForm.id_item) { toast({ title: 'Selecciona un material', variant: 'destructive' }); return; }
+    if (matForm.es_libre && !matForm.descripcion_libre) { toast({ title: 'Escribe el nombre del material', variant: 'destructive' }); return; }
+    const costo_total = Number(matForm.cantidad) * Number(matForm.costo_unitario);
+    const payload: any = {
+      id_trabajo:        id,
+      cantidad:          Number(matForm.cantidad),
+      costo_unitario:    Number(matForm.costo_unitario),
+      costo_total,
+    };
+    if (matForm.es_libre) {
+      payload.id_item           = null;
+      payload.descripcion_libre = matForm.descripcion_libre;
+    } else {
+      payload.id_item = matForm.id_item;
+    }
+    await insertRow('trabajo_materiales', payload);
+    reload(); setMatDialog(false);
+    setMatForm({ id_item: '', descripcion_libre: '', cantidad: 1, costo_unitario: 0, es_libre: false });
+    setMatSearch('');
     toast({ title: 'Material agregado' });
+  };
+
+  const moverACasa = async () => {
+    if (!moverCasaForm.nombre) { toast({ title: 'Nombre requerido', variant: 'destructive' }); return; }
+    await db.from('inventario_casa').insert({
+      nombre:      moverCasaForm.nombre,
+      descripcion: moverCasaForm.descripcion || trabajo.descripcion_trabajo,
+      tipo:        moverCasaForm.tipo,
+      estado:      moverCasaForm.estado,
+      ubicacion:   moverCasaForm.ubicacion,
+      notas:       `Movido desde trabajo: ${trabajo.descripcion_trabajo}`,
+    });
+    await updateRow('trabajos', trabajo.id, { estado: 'Cancelado', notas: (trabajo.notas || '') + ' [Movido a Inventario Casa]' });
+    setMoverCasaDialog(false);
+    reload();
+    toast({ title: '✅ Trabajo movido a Inventario Casa' });
   };
 
   const savePago = async () => {
@@ -550,6 +587,59 @@ export default function TrabajoDetalle() {
         </TabsContent>
       </Tabs>
 
+      {/* ── DIALOG MOVER A INVENTARIO CASA ── */}
+      <Dialog open={moverCasaDialog} onOpenChange={setMoverCasaDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>🏠 Mover a Inventario Casa</DialogTitle></DialogHeader>
+          <div className="grid gap-4 py-2">
+            <div className="p-3 rounded-lg bg-orange-50 dark:bg-orange-950/20 border border-orange-200 text-sm text-orange-700 dark:text-orange-400">
+              El trabajo pasará a Cancelado y la pieza quedará registrada en Inventario Casa del dueño.
+            </div>
+            <div className="grid gap-1.5">
+              <Label className="text-xs">Nombre de la pieza *</Label>
+              <Input value={moverCasaForm.nombre} onChange={e => setMoverCasaForm({...moverCasaForm, nombre: e.target.value})} placeholder="Ej: Sofá 3 puestos, Base de cama..." />
+            </div>
+            <div className="grid gap-1.5">
+              <Label className="text-xs">Descripción</Label>
+              <Input value={moverCasaForm.descripcion} onChange={e => setMoverCasaForm({...moverCasaForm, descripcion: e.target.value})} placeholder="Detalles adicionales..." />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="grid gap-1.5">
+                <Label className="text-xs">Tipo</Label>
+                <Select value={moverCasaForm.tipo} onValueChange={v => setMoverCasaForm({...moverCasaForm, tipo: v})}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {['Estructura','Espalda','Base de cama','Mueble completo','Otro'].map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-1.5">
+                <Label className="text-xs">Estado</Label>
+                <Select value={moverCasaForm.estado} onValueChange={v => setMoverCasaForm({...moverCasaForm, estado: v})}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {['Sin terminar','En proceso','Listo para vender'].map(e => <SelectItem key={e} value={e}>{e}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid gap-1.5">
+              <Label className="text-xs">Ubicación</Label>
+              <Select value={moverCasaForm.ubicacion} onValueChange={v => setMoverCasaForm({...moverCasaForm, ubicacion: v})}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {['Taller','Local Calle 8','Local Mercedes','Almacén Casa','Almacén Taller'].map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setMoverCasaDialog(false)}>Cancelar</Button>
+            <Button className="bg-orange-600 hover:bg-orange-700" onClick={moverACasa}>Mover a Inventario Casa</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* ── MODAL INTELIGENTE FINALIZAR ── */}
       <AlertDialog open={!!finalizarModal} onOpenChange={() => setFinalizarModal(null)}>
         <AlertDialogContent>
@@ -693,8 +783,16 @@ export default function TrabajoDetalle() {
         <div className="grid gap-4 py-2">
           <div className="grid gap-1.5"><Label className="text-xs">Empleado *</Label>
             <Select value={asigForm.id_empleado || ''} onValueChange={v => setAsigForm({ ...asigForm, id_empleado: v })}>
-              <SelectTrigger><SelectValue placeholder="Seleccionar" /></SelectTrigger>
-              <SelectContent>{empleados.filter((e: any) => e.activo).map((e: any) => <SelectItem key={e.id} value={e.id}>{e.nombre}</SelectItem>)}</SelectContent>
+              <SelectTrigger><SelectValue placeholder="Buscar empleado..." /></SelectTrigger>
+              <SelectContent>
+                <div className="px-2 py-1 sticky top-0 bg-popover z-10">
+                  <Input placeholder="Buscar..." value={asigSearch} onChange={e => setAsigSearch(e.target.value)}
+                    className="h-7 text-xs" onClick={e => e.stopPropagation()} />
+                </div>
+                {empleados
+                  .filter((e: any) => e.activo && e.nombre?.toLowerCase().includes(asigSearch.toLowerCase()))
+                  .map((e: any) => <SelectItem key={e.id} value={e.id}>{e.nombre}</SelectItem>)}
+              </SelectContent>
             </Select>
           </div>
           <div className="grid gap-1.5"><Label className="text-xs">Descripción *</Label><Input value={asigForm.descripcion || ''} onChange={e => setAsigForm({ ...asigForm, descripcion: e.target.value })} /></div>
@@ -704,23 +802,94 @@ export default function TrabajoDetalle() {
         </DialogContent>
       </Dialog>
 
-      {/* ── DIALOG MATERIAL ── */}
-      <Dialog open={matDialog} onOpenChange={setMatDialog}>
-        <DialogContent className="max-w-md"><DialogHeader><DialogTitle>Agregar Material</DialogTitle></DialogHeader>
-        <div className="grid gap-4 py-2">
-          <div className="grid gap-1.5"><Label className="text-xs">Material *</Label>
-            <Select value={matForm.id_item} onValueChange={v => { const item = inventario.find((i: any) => i.id === v); setMatForm({ ...matForm, id_item: v, costo_unitario: item?.costo_unitario || 0 }); }}>
-              <SelectTrigger><SelectValue placeholder="Seleccionar" /></SelectTrigger>
-              <SelectContent>{inventario.map((i: any) => <SelectItem key={i.id} value={i.id}>{i.nombre_item} (stock: {i.stock_actual})</SelectItem>)}</SelectContent>
-            </Select>
+      {/* ── DIALOG MATERIAL UNIFICADO ── */}
+      <Dialog open={matDialog} onOpenChange={v => { setMatDialog(v); if(!v){ setMatSearch(''); }}}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>Agregar Material al Trabajo</DialogTitle></DialogHeader>
+          <div className="grid gap-4 py-2">
+
+            {/* Toggle inventario / libre */}
+            <div className="grid grid-cols-2 gap-2">
+              <button onClick={() => setMatForm({...matForm, es_libre: false, descripcion_libre: ''})}
+                className={`p-2.5 rounded-lg border text-sm font-medium transition-colors ${!matForm.es_libre ? 'border-primary bg-primary/10 text-primary' : 'border-border hover:bg-secondary'}`}>
+                📦 Del inventario
+              </button>
+              <button onClick={() => setMatForm({...matForm, es_libre: true, id_item: '', costo_unitario: 0})}
+                className={`p-2.5 rounded-lg border text-sm font-medium transition-colors ${matForm.es_libre ? 'border-primary bg-primary/10 text-primary' : 'border-border hover:bg-secondary'}`}>
+                ✏️ Artículo libre
+              </button>
+            </div>
+
+            {/* Del inventario */}
+            {!matForm.es_libre ? (
+              <div className="grid gap-1.5">
+                <Label className="text-xs">Material del inventario *</Label>
+                <Select value={matForm.id_item || 'ninguno'} onValueChange={v => {
+                  const item = inventario.find((i: any) => i.id === v);
+                  setMatForm({...matForm, id_item: v === 'ninguno' ? '' : v, costo_unitario: item?.costo_unitario || 0});
+                }}>
+                  <SelectTrigger><SelectValue placeholder="Buscar material..." /></SelectTrigger>
+                  <SelectContent>
+                    <div className="px-2 py-1 sticky top-0 bg-popover z-10">
+                      <Input placeholder="Buscar..." value={matSearch} onChange={e => setMatSearch(e.target.value)}
+                        className="h-7 text-xs" onClick={e => e.stopPropagation()} />
+                    </div>
+                    <SelectItem value="ninguno">— Seleccionar —</SelectItem>
+                    {inventario
+                      .filter((i: any) => i.nombre_item?.toLowerCase().includes(matSearch.toLowerCase()))
+                      .map((i: any) => (
+                        <SelectItem key={i.id} value={i.id}>
+                          {i.nombre_item} · stock: {i.stock_actual ?? 0} {i.unidad}
+                        </SelectItem>
+                      ))
+                    }
+                  </SelectContent>
+                </Select>
+                {matForm.id_item && (() => {
+                  const item = inventario.find((i: any) => i.id === matForm.id_item);
+                  return item ? (
+                    <p className="text-xs text-muted-foreground">
+                      Stock disponible: <span className={`font-medium ${(item.stock_actual ?? 0) < matForm.cantidad ? 'text-destructive' : 'text-green-600'}`}>{item.stock_actual ?? 0} {item.unidad}</span>
+                    </p>
+                  ) : null;
+                })()}
+              </div>
+            ) : (
+              <div className="grid gap-1.5">
+                <Label className="text-xs">Nombre del material *</Label>
+                <Input placeholder="Ej: Tela café, Goma media, Grapas 1/2..."
+                  value={matForm.descripcion_libre} onChange={e => setMatForm({...matForm, descripcion_libre: e.target.value})} />
+                <p className="text-xs text-muted-foreground">Este material no está en inventario — se va a comprar o ya se tiene fuera</p>
+              </div>
+            )}
+
+            {/* Cantidad y costo — siempre visibles */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-1.5">
+                <Label className="text-xs">Cantidad</Label>
+                <Input type="number" min={0.1} step={0.1}
+                  value={matForm.cantidad === 0 ? '' : matForm.cantidad}
+                  onChange={e => setMatForm({...matForm, cantidad: e.target.value === '' ? 0 : +e.target.value})} />
+              </div>
+              <div className="grid gap-1.5">
+                <Label className="text-xs">Costo unitario</Label>
+                <Input type="number" min={0}
+                  value={matForm.costo_unitario === 0 ? '' : matForm.costo_unitario}
+                  onChange={e => setMatForm({...matForm, costo_unitario: e.target.value === '' ? 0 : +e.target.value})} />
+              </div>
+            </div>
+
+            {/* Total */}
+            <div className="flex justify-between items-center p-3 rounded-lg bg-secondary/50">
+              <span className="text-sm text-muted-foreground">Total costo</span>
+              <span className="font-semibold text-primary">{formatCurrency(matForm.cantidad * matForm.costo_unitario)}</span>
+            </div>
+
           </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="grid gap-1.5"><Label className="text-xs">Cantidad</Label><Input type="number" value={matForm.cantidad} onChange={e => setMatForm({ ...matForm, cantidad: +e.target.value })} /></div>
-            <div className="grid gap-1.5"><Label className="text-xs">Costo Unit.</Label><Input type="number" value={matForm.costo_unitario} onChange={e => setMatForm({ ...matForm, costo_unitario: +e.target.value })} /></div>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => { setMatDialog(false); setMatSearch(''); }}>Cancelar</Button>
+            <Button onClick={saveMat}>Agregar material</Button>
           </div>
-          <p className="text-sm text-right font-medium">Total: {formatCurrency(matForm.cantidad * matForm.costo_unitario)}</p>
-        </div>
-        <div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setMatDialog(false)}>Cancelar</Button><Button onClick={saveMat}>Agregar</Button></div>
         </DialogContent>
       </Dialog>
     </div>
