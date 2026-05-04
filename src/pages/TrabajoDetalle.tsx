@@ -602,19 +602,25 @@ export default function TrabajoDetalle() {
                 ${medidas ? `<div class="field" style="grid-column:span 2"><label>Medidas del mueble</label><p>${medidas} pulgadas</p></div>` : ''}
               </div>
               <table>
-                <thead><tr><th>Material entregado</th><th>Cantidad</th><th>Costo</th><th>Usado</th><th>Sobrante</th></tr></thead>
+                <thead><tr><th>Material entregado</th><th>Cantidad</th><th>Unidad</th><th>Cantidad usada</th><th>Sobrante</th></tr></thead>
                 <tbody>
                   ${materiales.map((m: any) => {
                     const nombre = m.descripcion_libre || inventario.find((i: any) => i.id === m.id_item)?.nombre_item || '—';
-                    return `<tr><td>${nombre}</td><td>${m.cantidad}</td><td>${formatCurrency(m.costo_unitario)}</td><td class="espacio">_______</td><td class="espacio">_______</td></tr>`;
+                    const item = inventario.find((i: any) => i.id === m.id_item);
+                    const unidad = item?.unidad || '';
+                    return `<tr><td>${nombre}</td><td>${m.cantidad}</td><td>${unidad}</td><td class="espacio">_______</td><td class="espacio">_______</td></tr>`;
                   }).join('')}
                   <tr><td class="espacio" style="font-style:italic">__________________________</td><td></td><td></td><td class="espacio">_______</td><td class="espacio">_______</td></tr>
                   <tr><td class="espacio" style="font-style:italic">__________________________</td><td></td><td></td><td class="espacio">_______</td><td class="espacio">_______</td></tr>
                 </tbody>
               </table>
               ${trabajo.notas ? `<div style="margin-top:12px;padding:8px;background:#f8f8f8;border-radius:4px;font-size:11px"><strong>Notas:</strong> ${trabajo.notas}</div>` : ''}
+              <div style="margin-top:16px;border:1px solid #ddd;border-radius:6px;padding:10px">
+                <p style="font-size:10px;color:#888;margin-bottom:6px">Observaciones del empleado:</p>
+                <div style="min-height:40px"></div>
+              </div>
               <div class="firma">
-                <div class="firma-box">Entregado por</div>
+                <div class="firma-box">Entregado por (Supervisor)</div>
                 <div class="firma-box">Recibido por (Empleado)</div>
               </div>
               </body></html>`;
