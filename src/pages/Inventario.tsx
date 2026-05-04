@@ -628,7 +628,7 @@ export default function Inventario() {
         </Dialog>
       )}
 
-      {/* Dialog agregar pieza */}}
+      {/* Dialog agregar pieza */}
           <Dialog open={invCasaDialog} onOpenChange={setInvCasaDialog}>
             <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
               <DialogHeader><DialogTitle>Nueva pieza — Inventario Casa</DialogTitle></DialogHeader>
