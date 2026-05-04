@@ -168,22 +168,11 @@ export default function TrabajoDetalle() {
     } else {
       payload.id_item = matForm.id_item;
     }
-    payload.sobrante = Number(matForm.sobrante) || 0;
-    payload.devuelto_inventario = false;
     await insertRow('trabajo_materiales', payload);
-
-    // Si es tela y hay sobrante, devolver al inventario
-    if (!matForm.es_libre && matForm.id_item && payload.sobrante > 0) {
-      const item = inventario.find((i: any) => i.id === matForm.id_item);
-      if (item && item.categoria === 'Tela') {
-        await updateRow('inventario', matForm.id_item, { stock_actual: (item.stock_actual || 0) + payload.sobrante });
-        await db.from('trabajo_materiales').update({ devuelto_inventario: true }).eq('id_trabajo', id).eq('id_item', matForm.id_item).order('created_at', { ascending: false }).limit(1);
-      }
-    }
     reload(); setMatDialog(false);
-    setMatForm({ id_item: '', descripcion_libre: '', cantidad: 1, costo_unitario: 0, es_libre: false, sobrante: 0 });
+    setMatForm({ id_item: '', descripcion_libre: '', cantidad: 1, costo_unitario: 0, es_libre: false });
     setMatSearch('');
-    toast({ title: 'Material registrado' });
+    toast({ title: 'Material agregado' });
   };
 
   const moverACasa = async () => {
@@ -301,6 +290,12 @@ export default function TrabajoDetalle() {
             {trabajo.estado !== 'Finalizado' && trabajo.estado !== 'Entregado' && trabajo.estado !== 'Cancelado' && (
               <Button size="sm" variant="outline" onClick={marcarFinalizado}>Finalizar</Button>
             )}
+            {trabajo.estado !== 'Cancelado' && trabajo.estado !== 'Entregado' && (
+              <Button size="sm" variant="outline" className="text-orange-600 border-orange-300 hover:bg-orange-50"
+                onClick={() => { setMoverCasaForm({ nombre: trabajo.descripcion_trabajo || '', descripcion: '', tipo: 'Estructura', estado: 'Sin terminar', ubicacion: 'Local Mercedes' }); setMoverCasaDialog(true); }}>
+                🏠 Mover a Casa
+              </Button>
+            )}
             <div className="flex items-center gap-2 flex-wrap justify-end">
               <div className="flex items-center gap-1.5">
                 <input type="checkbox" id="ncf-toggle" checked={ncfActivo}
@@ -375,11 +370,8 @@ export default function TrabajoDetalle() {
             <div><span className="text-xs text-muted-foreground">Local</span><p>{trabajo.local_trabajo || '—'}</p></div>
             <div><span className="text-xs text-muted-foreground">Origen</span><p>{trabajo.origen || 'Cliente'}</p></div>
             {(trabajo.medida_largo || trabajo.medida_ancho || trabajo.medida_profundidad) && (
-              <div className="col-span-2">
-                <span className="text-xs text-muted-foreground">Medidas del mueble</span>
-                <p className="text-sm font-medium text-blue-600 dark:text-blue-400">
-                  📐 {[trabajo.medida_largo, trabajo.medida_ancho, trabajo.medida_profundidad].filter(Boolean).join(' × ')} pulgadas
-                </p>
+              <div className="col-span-2"><span className="text-xs text-muted-foreground">Medidas</span>
+                <p className="text-sm font-medium text-blue-600">📐 {[trabajo.medida_largo, trabajo.medida_ancho, trabajo.medida_profundidad].filter(Boolean).join(' × ')} pulgadas</p>
               </div>
             )}
             {trabajo.notas && <div className="col-span-2"><span className="text-xs text-muted-foreground">Notas</span><p>{trabajo.notas}</p></div>}
@@ -394,10 +386,10 @@ export default function TrabajoDetalle() {
             {pendiente > 0 && <span className="ml-1.5 w-2 h-2 rounded-full bg-destructive inline-block" />}
           </TabsTrigger>
           <TabsTrigger value="asignaciones">👷 Empleados ({asignaciones.length})</TabsTrigger>
-          <TabsTrigger value="materiales">💰 Gastos ({materiales.length})</TabsTrigger>
+          <TabsTrigger value="materiales">📦 Materiales ({materiales.length})</TabsTrigger>
           <TabsTrigger value="caja">🏦 Caja ({movCaja.length})</TabsTrigger>
           <TabsTrigger value="bom">
-            📋 Ficha ({bom.length})
+            📋 Materiales ({bom.length})
             {bom.filter((b: any) => b.estado === 'Pendiente').length > 0 && (
               <span className="ml-1 w-2 h-2 rounded-full bg-amber-500 inline-block" />
             )}
@@ -495,16 +487,23 @@ export default function TrabajoDetalle() {
           </div>
         </TabsContent>
 
-        {/* ══ MATERIALES ══ */}
-        <TabsContent value="materiales" className="mt-4">
-          <div className="flex justify-between items-center mb-3">
-            <p className="text-sm text-muted-foreground">Total Mat: <span className="font-semibold text-foreground">{formatCurrency(totalMat)}</span></p>
-            {isOwner && <Button size="sm" onClick={() => { setMatForm({ id_item: '', cantidad: 1, costo_unitario: 0 }); setMatDialog(true); }}><Plus className="h-4 w-4 mr-1" />Agregar</Button>}
+        {/* ══ MATERIALES (Gastos para KPI) ══ */}
+        <TabsContent value="materiales" className="mt-4 space-y-3">
+          <div className="flex justify-between items-center">
+            <p className="text-sm text-muted-foreground">Total: <span className="font-semibold text-foreground">{formatCurrency(totalMat)}</span></p>
+            {isOwner && (
+              <Button size="sm" onClick={() => { setMatForm({ id_item: '', descripcion_libre: '', cantidad: 1, costo_unitario: 0, es_libre: false, sobrante: 0 }); setMatSearch(''); setMatDialog(true); }}>
+                <Plus className="h-4 w-4 mr-1" />Agregar
+              </Button>
+            )}
           </div>
           <div className="border rounded-lg overflow-x-auto bg-card">
             <Table><TableHeader><TableRow>
-              <TableHead>Material</TableHead><TableHead className="text-right">Cant.</TableHead>
-              <TableHead className="text-right">Costo Unit.</TableHead><TableHead className="text-right">Total</TableHead>
+              <TableHead>Material</TableHead>
+              <TableHead className="text-right">Cant.</TableHead>
+              <TableHead className="text-right hidden sm:table-cell">Costo Unit.</TableHead>
+              <TableHead className="text-right">Total</TableHead>
+              <TableHead className="text-right hidden sm:table-cell">Sobrante</TableHead>
               {isOwner && <TableHead className="w-[50px]" />}
             </TableRow></TableHeader>
             <TableBody>
@@ -518,14 +517,12 @@ export default function TrabajoDetalle() {
                       {m.descripcion_libre && <span className="text-xs text-muted-foreground ml-1">(libre)</span>}
                     </TableCell>
                     <TableCell className="text-right">{m.cantidad}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(m.costo_unitario)}</TableCell>
+                    <TableCell className="text-right hidden sm:table-cell text-muted-foreground">{formatCurrency(m.costo_unitario)}</TableCell>
                     <TableCell className="text-right font-medium">{formatCurrency(m.costo_total || m.cantidad * m.costo_unitario)}</TableCell>
-                    <TableCell className="text-right text-xs text-muted-foreground">
-                      {m.sobrante > 0 ? (
-                        <span className={m.devuelto_inventario ? 'text-green-600' : 'text-amber-600'}>
-                          {m.sobrante} sobra{m.devuelto_inventario ? ' ✅' : ''}
-                        </span>
-                      ) : '—'}
+                    <TableCell className="text-right hidden sm:table-cell">
+                      {(m.sobrante || 0) > 0
+                        ? <span className={`text-xs ${m.devuelto_inventario ? 'text-green-600' : 'text-amber-600'}`}>{m.sobrante}{m.devuelto_inventario ? ' ✅' : ''}</span>
+                        : <span className="text-xs text-muted-foreground">—</span>}
                     </TableCell>
                     {isOwner && <TableCell><Button variant="ghost" size="icon" onClick={async () => { await deleteRow('trabajo_materiales', m.id); reload(); }}><Trash2 className="h-4 w-4 text-destructive" /></Button></TableCell>}
                   </TableRow>
@@ -555,103 +552,122 @@ export default function TrabajoDetalle() {
             </TableBody></Table>
           </div>
         </TabsContent>
-        {/* ══ BOM — Materiales necesarios ══ */}
-        <TabsContent value="bom" className="mt-4 space-y-3">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs text-muted-foreground">Control de materiales entregados al empleado</p>
-            </div>
-            <div className="flex gap-2">
-              <Button size="sm" variant="outline" onClick={() => {
-                const empleado = asignaciones[0] ? empleados.find((e: any) => e.id === asignaciones[0].id_empleado)?.nombre || '—' : '—';
-                const medidas = [trabajo.medida_largo, trabajo.medida_ancho, trabajo.medida_profundidad].filter(Boolean).join(' × ');
-                const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Ficha de Trabajo</title>
-                <style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Segoe UI',sans-serif;padding:30px;max-width:700px;margin:auto;color:#1a1a1a}.header{border-bottom:3px solid #185FA5;padding-bottom:15px;margin-bottom:20px}.title{color:#185FA5;font-size:20px;font-weight:700}.info{display:grid;grid-template-columns:1fr 1fr;gap:8px 20px;margin:15px 0}.field{font-size:12px}.field label{color:#888;display:block;font-size:10px}table{width:100%;border-collapse:collapse;margin:15px 0}th{background:#185FA5;color:white;padding:8px;font-size:11px;text-align:left}td{padding:8px;border-bottom:1px solid #eee;font-size:12px}.firma{margin-top:40px;display:grid;grid-template-columns:1fr 1fr;gap:40px}.firma-box{border-top:1px solid #333;padding-top:8px;text-align:center;font-size:11px;color:#666}</style></head><body>
-                <div class="header"><div class="title">📋 Ficha de Trabajo</div><div style="font-size:11px;color:#666;margin-top:4px">Soluciones Decorativas José Luis</div></div>
-                <div class="info">
-                  <div class="field"><label>Descripción del trabajo</label><strong>${trabajo.descripcion_trabajo}</strong></div>
-                  <div class="field"><label>Empleado asignado</label><strong>${empleado}</strong></div>
-                  <div class="field"><label>Fecha inicio</label>${formatDate(trabajo.fecha_inicio)}</div>
-                  <div class="field"><label>Entrega estimada</label>${trabajo.fecha_entrega_estimada ? formatDate(trabajo.fecha_entrega_estimada) : '—'}</div>
-                  ${medidas ? `<div class="field"><label>Medidas del mueble</label><strong>${medidas} pulgadas</strong></div>` : ''}
-                  <div class="field"><label>Local</label>${trabajo.local_trabajo || '—'}</div>
-                </div>
-                <table><thead><tr><th>Material entregado</th><th>Cantidad</th><th>Unidad</th><th>Usado</th><th>Sobrante</th></tr></thead>
-                <tbody>${bom.map((b: any) => `<tr><td>${b.descripcion}</td><td>${b.cantidad}</td><td>${b.unidad}</td><td style="color:#ccc">______</td><td style="color:#ccc">______</td></tr>`).join('')}
-                <tr><td style="color:#ccc;font-style:italic">___________________</td><td></td><td></td><td></td><td></td></tr>
-                <tr><td style="color:#ccc;font-style:italic">___________________</td><td></td><td></td><td></td><td></td></tr>
-                </tbody></table>
-                <div style="margin-top:15px;padding:10px;background:#f9f9f9;border-radius:6px;font-size:11px;color:#666">
-                  <strong>Notas:</strong> ${trabajo.notas || '—'}
-                </div>
-                <div class="firma">
-                  <div class="firma-box">Entregado por</div>
-                  <div class="firma-box">Recibido por (Empleado)</div>
-                </div>
-                </body></html>`;
-                const w = window.open('', '_blank', 'width=800,height=600');
-                if (w) { w.document.write(html); w.document.close(); setTimeout(() => w.print(), 500); }
-              }} className="gap-1.5 text-xs">
-                🖨️ Imprimir ficha
-              </Button>
-              {isOwner && (
-                <Button size="sm" onClick={() => setBomDialog(true)} className="gap-1.5">
-                  <Plus className="h-4 w-4" />Agregar
-                </Button>
-              )}
-            </div>
-          </div>
+        {/* ══ FICHA DE TRABAJO ══ */}
+        <TabsContent value="bom" className="mt-4 space-y-4">
 
-          {/* Resumen */}
-          {bom.length > 0 && (
+          {/* Medidas — único campo editable en la ficha */}
+          <div className="p-3 rounded-xl border bg-secondary/20 space-y-3">
+            <p className="text-xs font-semibold text-muted-foreground">📐 Medidas del mueble (opcional)</p>
             <div className="grid grid-cols-3 gap-2">
-              {[{label:'Pendiente',color:'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300'},
-                {label:'Disponible',color:'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'},
-                {label:'Comprado',color:'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300'}].map(({label,color}) => (
-                <div key={label} className={`rounded-xl p-2 text-center ${color}`}>
-                  <p className="text-lg font-bold">{bom.filter((b: any) => b.estado === label).length}</p>
-                  <p className="text-xs">{label}</p>
+              {[
+                {label:'Largo', key:'medida_largo'},
+                {label:'Ancho', key:'medida_ancho'},
+                {label:'Profundidad', key:'medida_profundidad'}
+              ].map(({label, key}) => (
+                <div key={key} className="grid gap-1">
+                  <Label className="text-xs text-muted-foreground">{label}</Label>
+                  <Input type="number" min={0} placeholder="0"
+                    defaultValue={trabajo[key] || ''}
+                    className="h-8 text-sm"
+                    onBlur={async (e) => {
+                      const val = e.target.value === '' ? null : +e.target.value;
+                      await updateRow('trabajos', trabajo.id, { [key]: val });
+                      reload();
+                    }} />
                 </div>
               ))}
             </div>
-          )}
+            <p className="text-xs text-muted-foreground">Pulgadas · Se guarda al salir del campo</p>
+          </div>
 
-          {bom.length === 0 && (
-            <div className="border rounded-lg py-10 text-center text-muted-foreground bg-card">
+          {/* Materiales jalados de la pestaña de Materiales */}
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-semibold text-muted-foreground">Materiales registrados en este trabajo</p>
+            <Button size="sm" variant="outline" onClick={() => {
+              const empleado = asignaciones[0]
+                ? (empleados.find((e: any) => e.id === asignaciones[0].id_empleado)?.nombre || '—')
+                : '—';
+              const medidas = [trabajo.medida_largo, trabajo.medida_ancho, trabajo.medida_profundidad].filter(Boolean).join(' × ');
+              const clienteNombre = cliente?.nombre_completo || trabajo.nombre_libre || '—';
+              const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Ficha</title>
+              <style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Segoe UI',sans-serif;padding:24px;max-width:680px;margin:auto;color:#1a1a1a;font-size:13px}.header{border-bottom:3px solid #185FA5;padding-bottom:12px;margin-bottom:16px}.title{color:#185FA5;font-size:18px;font-weight:700}.sub{font-size:11px;color:#666;margin-top:2px}.info{display:grid;grid-template-columns:1fr 1fr;gap:8px 20px;margin-bottom:16px}.field label{font-size:10px;color:#888;display:block}.field p{font-weight:600}table{width:100%;border-collapse:collapse;margin-top:8px}th{background:#185FA5;color:#fff;padding:7px 10px;font-size:11px;text-align:left}td{padding:7px 10px;border-bottom:1px solid #eee;font-size:12px}.espacio{color:#ccc}.firma{margin-top:32px;display:grid;grid-template-columns:1fr 1fr;gap:40px}.firma-box{border-top:1px solid #555;padding-top:6px;text-align:center;font-size:10px;color:#666}</style></head><body>
+              <div class="header"><div class="title">📋 Ficha de Trabajo</div><div class="sub">Soluciones Decorativas José Luis — ${new Date().toLocaleDateString('es-DO')}</div></div>
+              <div class="info">
+                <div class="field"><label>Cliente</label><p>${clienteNombre}</p></div>
+                <div class="field"><label>Descripción del trabajo</label><p>${trabajo.descripcion_trabajo}</p></div>
+                <div class="field"><label>Empleado asignado</label><p>${empleado}</p></div>
+                <div class="field"><label>Local</label><p>${trabajo.local_trabajo || '—'}</p></div>
+                <div class="field"><label>Fecha inicio</label><p>${formatDate(trabajo.fecha_inicio)}</p></div>
+                <div class="field"><label>Entrega estimada</label><p>${trabajo.fecha_entrega_estimada ? formatDate(trabajo.fecha_entrega_estimada) : '—'}</p></div>
+                ${medidas ? `<div class="field" style="grid-column:span 2"><label>Medidas del mueble</label><p>${medidas} pulgadas</p></div>` : ''}
+              </div>
+              <table>
+                <thead><tr><th>Material entregado</th><th>Cantidad</th><th>Costo</th><th>Usado</th><th>Sobrante</th></tr></thead>
+                <tbody>
+                  ${materiales.map((m: any) => {
+                    const nombre = m.descripcion_libre || inventario.find((i: any) => i.id === m.id_item)?.nombre_item || '—';
+                    return `<tr><td>${nombre}</td><td>${m.cantidad}</td><td>${formatCurrency(m.costo_unitario)}</td><td class="espacio">_______</td><td class="espacio">_______</td></tr>`;
+                  }).join('')}
+                  <tr><td class="espacio" style="font-style:italic">__________________________</td><td></td><td></td><td class="espacio">_______</td><td class="espacio">_______</td></tr>
+                  <tr><td class="espacio" style="font-style:italic">__________________________</td><td></td><td></td><td class="espacio">_______</td><td class="espacio">_______</td></tr>
+                </tbody>
+              </table>
+              ${trabajo.notas ? `<div style="margin-top:12px;padding:8px;background:#f8f8f8;border-radius:4px;font-size:11px"><strong>Notas:</strong> ${trabajo.notas}</div>` : ''}
+              <div class="firma">
+                <div class="firma-box">Entregado por</div>
+                <div class="firma-box">Recibido por (Empleado)</div>
+              </div>
+              </body></html>`;
+              const w = window.open('', '_blank', 'width=780,height=600');
+              if (w) { w.document.write(html); w.document.close(); setTimeout(() => w.print(), 500); }
+            }} className="gap-1.5 text-xs">
+              🖨️ Imprimir ficha
+            </Button>
+          </div>
+
+          {materiales.length === 0 ? (
+            <div className="border rounded-lg py-8 text-center text-muted-foreground bg-card">
               <p className="text-sm">Sin materiales registrados</p>
-              <p className="text-xs mt-1">Agrega lo que el tapicero necesita antes de comprar</p>
-              {isOwner && <Button size="sm" variant="outline" className="mt-3" onClick={() => setBomDialog(true)}>Agregar primer material</Button>}
+              <p className="text-xs mt-1">Registra materiales en la pestaña 📦 Materiales</p>
+            </div>
+          ) : (
+            <div className="border rounded-lg overflow-x-auto bg-card">
+              <Table>
+                <TableHeader><TableRow>
+                  <TableHead>Material</TableHead>
+                  <TableHead className="text-right">Cant.</TableHead>
+                  <TableHead className="text-right hidden sm:table-cell">Costo unit.</TableHead>
+                  <TableHead className="text-right">Total</TableHead>
+                  <TableHead className="text-right hidden sm:table-cell">Sobrante</TableHead>
+                </TableRow></TableHeader>
+                <TableBody>
+                  {materiales.map((m: any) => {
+                    const nombre = m.descripcion_libre || inventario.find((i: any) => i.id === m.id_item)?.nombre_item || '—';
+                    return (
+                      <TableRow key={m.id}>
+                        <TableCell className="font-medium text-sm">
+                          {nombre}
+                          {m.descripcion_libre && <span className="text-xs text-muted-foreground ml-1">(libre)</span>}
+                        </TableCell>
+                        <TableCell className="text-right">{m.cantidad}</TableCell>
+                        <TableCell className="text-right hidden sm:table-cell text-muted-foreground">{formatCurrency(m.costo_unitario)}</TableCell>
+                        <TableCell className="text-right font-medium">{formatCurrency(m.costo_total || m.cantidad * m.costo_unitario)}</TableCell>
+                        <TableCell className="text-right hidden sm:table-cell">
+                          {m.sobrante > 0
+                            ? <span className={m.devuelto_inventario ? 'text-green-600 text-xs' : 'text-amber-600 text-xs'}>{m.sobrante}{m.devuelto_inventario ? ' ✅' : ''}</span>
+                            : <span className="text-muted-foreground text-xs">—</span>}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+              <div className="p-3 border-t flex justify-between items-center">
+                <span className="text-xs text-muted-foreground">Total materiales</span>
+                <span className="font-semibold text-primary">{formatCurrency(totalMat)}</span>
+              </div>
             </div>
           )}
-
-          <div className="space-y-2">
-            {bom.map((b: any) => {
-              const estadoColor: Record<string,string> = {
-                'Pendiente':  'bg-amber-100 text-amber-800 dark:bg-amber-900/30',
-                'Disponible': 'bg-green-100 text-green-800 dark:bg-green-900/30',
-                'Comprado':   'bg-blue-100 text-blue-800 dark:bg-blue-900/30',
-              };
-              return (
-                <div key={b.id} className="flex items-center gap-3 p-3 rounded-xl border bg-card">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <p className="font-medium text-sm">{b.descripcion}</p>
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${estadoColor[b.estado]}`}>{b.estado}</span>
-                    </div>
-                    <p className="text-xs text-muted-foreground">{b.cantidad} {b.unidad}{b.inventario ? ` · En inventario: ${b.inventario.nombre_item}` : ''}{b.notas ? ` · ${b.notas}` : ''}</p>
-                  </div>
-                  {isOwner && (
-                    <div className="flex gap-1 shrink-0">
-                      {b.estado === 'Pendiente' && <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => updateBomEstado(b.id, 'Disponible')}>✓ Hay</Button>}
-                      {b.estado === 'Pendiente' && <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => updateBomEstado(b.id, 'Comprado')}>🛒 Comprado</Button>}
-                      {b.estado !== 'Pendiente' && <Button variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground" onClick={() => updateBomEstado(b.id, 'Pendiente')}>↩</Button>}
-                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => deleteBom(b.id)}><Trash2 className="h-3 w-3 text-destructive" /></Button>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
         </TabsContent>
       </Tabs>
 
@@ -708,7 +724,45 @@ export default function TrabajoDetalle() {
         </DialogContent>
       </Dialog>
 
-      {/* ── MODAL INTELIGENTE FINALIZAR ── */}
+      {/* ── DIALOG MOVER A INVENTARIO CASA ── */}
+      <Dialog open={moverCasaDialog} onOpenChange={setMoverCasaDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>🏠 Mover a Inventario Casa</DialogTitle></DialogHeader>
+          <div className="grid gap-4 py-2">
+            <div className="p-3 rounded-lg bg-orange-50 dark:bg-orange-950/20 border border-orange-200 text-sm text-orange-700 dark:text-orange-400">
+              El trabajo pasará a Cancelado y la pieza quedará en Inventario Casa del dueño.
+            </div>
+            <div className="grid gap-1.5"><Label className="text-xs">Nombre *</Label><Input value={moverCasaForm.nombre} onChange={e => setMoverCasaForm({...moverCasaForm, nombre: e.target.value})} /></div>
+            <div className="grid gap-1.5"><Label className="text-xs">Descripción</Label><Input value={moverCasaForm.descripcion} onChange={e => setMoverCasaForm({...moverCasaForm, descripcion: e.target.value})} /></div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="grid gap-1.5"><Label className="text-xs">Tipo</Label>
+                <Select value={moverCasaForm.tipo} onValueChange={v => setMoverCasaForm({...moverCasaForm, tipo: v})}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>{['Estructura','Espalda','Base de cama','Mueble completo','Otro'].map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-1.5"><Label className="text-xs">Estado</Label>
+                <Select value={moverCasaForm.estado} onValueChange={v => setMoverCasaForm({...moverCasaForm, estado: v})}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>{['Sin terminar','En proceso','Listo para vender'].map(e => <SelectItem key={e} value={e}>{e}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid gap-1.5"><Label className="text-xs">Ubicación</Label>
+              <Select value={moverCasaForm.ubicacion} onValueChange={v => setMoverCasaForm({...moverCasaForm, ubicacion: v})}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>{['Taller','Local Calle 8','Local Mercedes','Almacén Casa','Almacén Taller'].map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setMoverCasaDialog(false)}>Cancelar</Button>
+            <Button className="bg-orange-600 hover:bg-orange-700" onClick={moverACasa}>Mover</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── MODAL INTELIGENTE FINALIZAR ── */}}
       <AlertDialog open={!!finalizarModal} onOpenChange={() => setFinalizarModal(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -945,19 +999,6 @@ export default function TrabajoDetalle() {
                   value={matForm.costo_unitario === 0 ? '' : matForm.costo_unitario}
                   onChange={e => setMatForm({...matForm, costo_unitario: e.target.value === '' ? 0 : +e.target.value})} />
               </div>
-            </div>
-
-            {/* Sobrante */}
-            <div className="grid gap-1.5">
-              <Label className="text-xs">
-                Sobrante {!matForm.es_libre && inventario.find((i: any) => i.id === matForm.id_item)?.categoria === 'Tela' ?
-                  <span className="text-green-600 ml-1">· Tela: se devuelve al inventario automáticamente</span> :
-                  <span className="text-muted-foreground ml-1">(opcional)</span>
-                }
-              </Label>
-              <Input type="number" min={0} step={0.1} placeholder="0"
-                value={matForm.sobrante === 0 ? '' : matForm.sobrante}
-                onChange={e => setMatForm({...matForm, sobrante: e.target.value === '' ? 0 : +e.target.value})} />
             </div>
 
             {/* Total */}

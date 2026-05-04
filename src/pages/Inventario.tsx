@@ -20,14 +20,15 @@ import { registrarAuditoria } from '@/hooks/useAuditoria';
 const db = supabase as any;
 
 // ── Materia prima ──────────────────────────────────────────────
-const categorias  = ['Tela', 'Madera', 'Espuma', 'Pegamento', 'Herramienta', 'Acabado', 'Goma molida', 'Otro'];
+const categorias  = ['Tela', 'Madera', 'Goma', 'Relleno', 'Herrajes', 'Pegamento', 'Pintura y acabado', 'Tapicería', 'Varios'];
 const skuPrefijo: Record<string, string> = {
-  'Tela': 'TEL', 'Madera': 'MAD', 'Espuma': 'ESP',
-  'Pegamento': 'PEG', 'Herramienta': 'HER', 'Acabado': 'ACA', 'Otro': 'OTR',
+  'Tela': 'TEL', 'Madera': 'MAD', 'Goma': 'GOM', 'Relleno': 'REL',
+  'Herrajes': 'HER', 'Pegamento': 'PEG', 'Pintura y acabado': 'PIN',
+  'Tapicería': 'TAP', 'Varios': 'VAR',
 };
 const ubicaciones = ['Almacén Casa', 'Local Mercedes', 'Local Calle 8', 'Telas', 'Almacén Taller'];
-const unidades    = ['unidad', 'yarda', 'metro', 'pie', 'galón', 'plancha', 'caja', 'rollo'];
-const emptyItem  = { nombre_item: '', categoria: 'Tela', unidad: 'unidad', stock_actual: null as number | null, stock_minimo: null as number | null, costo_unitario: 0, ubicacion: '' };
+const unidades    = ['unidad', 'yarda', 'metro', 'pie', 'galón', 'plancha', 'caja', 'rollo', 'lata', 'libra', 'pulgada'];
+const emptyItem  = { nombre_item: '', categoria: 'Tela', unidad: 'unidad', stock_actual: null as number | null, stock_minimo: null as number | null, costo_unitario: 0, ubicacion: '', sobrante: null as number | null };
 const emptyMov   = { id_item: '', tipo_movimiento: 'Entrada', cantidad: 0, motivo: '', fecha: new Date().toISOString().slice(0, 10), id_trabajo: null, asignado_a: '' };
 
 // ── Muebles / Productos terminados ────────────────────────────
@@ -92,7 +93,15 @@ export default function Inventario() {
   const [fotoPreview, setFotoPreview] = useState<string | null>(null);
   const [fotoDialog, setFotoDialog] = useState<any>(null);
   const [movSearch, setMovSearch] = useState('');
-  const [moverItemDialog, setMoverItemDialog] = useState<any>(null); // artículo a mover a inv casa
+  const [moverItemDialog, setMoverItemDialog] = useState<any>(null);
+  // Herramientas
+  const [herramientas, setHerramientas]       = useState<any[]>([]);
+  const [herrDialog, setHerrDialog]           = useState(false);
+  const [herrForm, setHerrForm]               = useState<any>({ nombre: '', descripcion: '', ubicacion: 'Taller', responsable: '', estado: 'Bueno', notas: '' });
+  const [herrFotoFile, setHerrFotoFile]       = useState<File | null>(null);
+  const [herrFotoPreview, setHerrFotoPreview] = useState<string | null>(null);
+  const [deleteHerrId, setDeleteHerrId]       = useState<string | null>(null);
+  const herrFileRef = useRef<HTMLInputElement>(null); // artículo a mover a inv casa
   const [movFiltro, setMovFiltro] = useState<'hoy'|'semana'|'mes'|'todos'>('mes');
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -153,7 +162,12 @@ export default function Inventario() {
     setInvCasa(data || []);
   };
 
-  useEffect(() => { reload(); reloadMuebles(); reloadGaleria(); reloadInvCasa(); }, []);
+  const reloadHerramientas = async () => {
+    const { data } = await db.from('herramientas').select('*').order('nombre');
+    setHerramientas(data || []);
+  };
+
+  useEffect(() => { reload(); reloadMuebles(); reloadGaleria(); reloadInvCasa(); reloadHerramientas(); }, []);
 
   // ════════════════════════════════════════════════
   // MATERIA PRIMA
@@ -329,6 +343,7 @@ export default function Inventario() {
           <TabsTrigger value="muebles">Catálogo 🛋️</TabsTrigger>
           <TabsTrigger value="galeria">🏠 Inv. Casa</TabsTrigger>
           <TabsTrigger value="movimientos">Movimientos ({movs.length})</TabsTrigger>
+          <TabsTrigger value="herramientas">🔧 Equipos ({herramientas.length})</TabsTrigger>
         </TabsList>
 
         {/* ══════════════ MATERIA PRIMA ══════════════ */}
@@ -815,6 +830,130 @@ export default function Inventario() {
               </>
             );
           })()}
+        </TabsContent>
+
+        {/* ══════════════ HERRAMIENTAS ══════════════ */}
+        <TabsContent value="herramientas" className="mt-4 space-y-4">
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-muted-foreground">Equipos y herramientas del taller</p>
+            {isOwner && (
+              <Button onClick={() => { setHerrForm({ nombre: '', descripcion: '', ubicacion: 'Taller', responsable: '', estado: 'Bueno', notas: '' }); setHerrFotoFile(null); setHerrFotoPreview(null); setHerrDialog(true); }}>
+                <Plus className="h-4 w-4 mr-1" />Agregar equipo
+              </Button>
+            )}
+          </div>
+
+          {herramientas.length > 0 && (
+            <div className="grid grid-cols-3 gap-2">
+              {[{label:'Bueno',color:'bg-green-100 text-green-800 dark:bg-green-900/30'},
+                {label:'Dañado',color:'bg-red-100 text-red-800 dark:bg-red-900/30'},
+                {label:'En reparación',color:'bg-amber-100 text-amber-800 dark:bg-amber-900/30'}].map(({label,color}) => (
+                <div key={label} className={`rounded-xl p-2 text-center ${color}`}>
+                  <p className="text-xl font-bold">{herramientas.filter(h => h.estado === label).length}</p>
+                  <p className="text-xs">{label}</p>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {herramientas.length === 0 && (
+            <div className="text-center py-12 border rounded-xl bg-card text-muted-foreground">
+              <p className="text-sm">Sin equipos registrados</p>
+              <p className="text-xs mt-1">Agrega taladro, compresor, grapadora, etc.</p>
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {herramientas.map((h: any) => {
+              const estadoColor: Record<string,string> = {
+                'Bueno':'bg-green-100 text-green-800 dark:bg-green-900/30',
+                'Dañado':'bg-red-100 text-red-800 dark:bg-red-900/30',
+                'En reparación':'bg-amber-100 text-amber-800 dark:bg-amber-900/30',
+              };
+              return (
+                <div key={h.id} className="border rounded-xl overflow-hidden bg-card flex gap-3">
+                  {h.foto_url
+                    ? <img src={h.foto_url} alt={h.nombre} className="w-20 h-20 object-cover shrink-0" />
+                    : <div className="w-20 h-20 bg-secondary flex items-center justify-center shrink-0 text-2xl">🔧</div>
+                  }
+                  <div className="flex-1 min-w-0 p-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="font-semibold text-sm truncate">{h.nombre}</p>
+                      {isOwner && <button onClick={() => setDeleteHerrId(h.id)} className="shrink-0"><Trash2 className="h-3.5 w-3.5 text-destructive" /></button>}
+                    </div>
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${estadoColor[h.estado]}`}>{h.estado}</span>
+                    <p className="text-xs text-muted-foreground mt-1">{h.ubicacion}{h.responsable ? ` · ${h.responsable}` : ''}</p>
+                    {h.descripcion && <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{h.descripcion}</p>}
+                    {isOwner && (
+                      <div className="mt-2 flex gap-1 flex-wrap">
+                        {['Bueno','Dañado','En reparación'].filter(e => e !== h.estado).map(sig => (
+                          <button key={sig} onClick={async () => { await db.from('herramientas').update({ estado: sig }).eq('id', h.id); reloadHerramientas(); }}
+                            className="text-xs px-2 py-0.5 rounded border hover:bg-secondary transition-colors">→ {sig}</button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <Dialog open={herrDialog} onOpenChange={setHerrDialog}>
+            <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+              <DialogHeader><DialogTitle>Agregar Herramienta / Equipo</DialogTitle></DialogHeader>
+              <div className="grid gap-4 py-2">
+                <div className="grid gap-1.5"><Label className="text-xs">Nombre *</Label><Input placeholder="Ej: Taladro, Compresor, Grapadora..." value={herrForm.nombre} onChange={e => setHerrForm({...herrForm, nombre: e.target.value})} /></div>
+                <div className="grid gap-1.5"><Label className="text-xs">Descripción</Label><Input placeholder="Marca, modelo..." value={herrForm.descripcion || ''} onChange={e => setHerrForm({...herrForm, descripcion: e.target.value})} /></div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="grid gap-1.5">
+                    <Label className="text-xs">Ubicación</Label>
+                    <Select value={herrForm.ubicacion} onValueChange={v => setHerrForm({...herrForm, ubicacion: v})}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>{['Taller','Local Mercedes','Local Calle 8'].map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}</SelectContent>
+                    </Select>
+                  </div>
+                  <div className="grid gap-1.5">
+                    <Label className="text-xs">Estado</Label>
+                    <Select value={herrForm.estado} onValueChange={v => setHerrForm({...herrForm, estado: v})}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>{['Bueno','Dañado','En reparación'].map(e => <SelectItem key={e} value={e}>{e}</SelectItem>)}</SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="grid gap-1.5"><Label className="text-xs">Responsable</Label><Input placeholder="Nombre del empleado responsable" value={herrForm.responsable || ''} onChange={e => setHerrForm({...herrForm, responsable: e.target.value})} /></div>
+                <div className="grid gap-1.5">
+                  <Label className="text-xs">Foto (opcional)</Label>
+                  <input ref={herrFileRef} type="file" accept="image/*" className="hidden" onChange={e => { const f = e.target.files?.[0]; if(f){ setHerrFotoFile(f); setHerrFotoPreview(URL.createObjectURL(f)); }}} />
+                  {herrFotoPreview
+                    ? <div className="relative"><img src={herrFotoPreview} className="w-full h-32 object-cover rounded-lg border" /><button onClick={() => {setHerrFotoFile(null); setHerrFotoPreview(null);}} className="absolute top-1 right-1 bg-destructive text-white rounded-full w-5 h-5 flex items-center justify-center text-xs">×</button></div>
+                    : <Button variant="outline" className="gap-2 h-14 border-dashed w-full" onClick={() => herrFileRef.current?.click()}><ImagePlus className="h-4 w-4" />Agregar foto</Button>
+                  }
+                </div>
+                <div className="grid gap-1.5"><Label className="text-xs">Notas</Label><Textarea value={herrForm.notas || ''} onChange={e => setHerrForm({...herrForm, notas: e.target.value})} rows={2} /></div>
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setHerrDialog(false)}>Cancelar</Button>
+                <Button onClick={async () => {
+                  if (!herrForm.nombre) { toast({ title: 'Nombre requerido', variant: 'destructive' }); return; }
+                  let foto_url = null;
+                  if (herrFotoFile) foto_url = await subirImagen('herramientas', herrFotoFile);
+                  await db.from('herramientas').insert({ ...herrForm, foto_url });
+                  reloadHerramientas(); setHerrDialog(false);
+                  toast({ title: '✅ Equipo agregado' });
+                }}>Guardar</Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+
+          <AlertDialog open={!!deleteHerrId} onOpenChange={() => setDeleteHerrId(null)}>
+            <AlertDialogContent>
+              <AlertDialogHeader><AlertDialogTitle>¿Eliminar equipo?</AlertDialogTitle><AlertDialogDescription>Esta acción no se puede deshacer.</AlertDialogDescription></AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                <AlertDialogAction onClick={async () => { await db.from('herramientas').delete().eq('id', deleteHerrId); setDeleteHerrId(null); reloadHerramientas(); toast({ title: 'Equipo eliminado' }); }}>Eliminar</AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </TabsContent>
       </Tabs>
 
