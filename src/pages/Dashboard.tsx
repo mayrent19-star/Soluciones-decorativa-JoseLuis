@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { DollarSign, Briefcase, Sunrise, Sunset, AlertTriangle, MapPin, Home, ShoppingBag } from 'lucide-react';
+import { DollarSign, Briefcase, Sunrise, Sunset, AlertTriangle, MapPin, ShoppingBag } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { formatCurrency, formatDate } from '@/utils/helpers';
 import { useAuth } from '@/hooks/useAuth';
@@ -65,12 +65,11 @@ export default function Dashboard() {
 
   // Por local
   const porLocal = {
-    calle8:   trabajos.filter((t: any) => !['Entregado','Cancelado'].includes(t.estado) && (t.local_trabajo === 'Local Calle 8' || !t.local_trabajo)).length,
-    mercedes: trabajos.filter((t: any) => !['Entregado','Cancelado'].includes(t.estado) && t.local_trabajo === 'Local Mercedes').length,
+    taller:   trabajos.filter((t: any) => !['Entregado','Cancelado'].includes(t.estado) && (t.local_trabajo === 'Taller' || t.local_trabajo === 'Almacén Taller' || !t.local_trabajo)).length,
+    mercedes: trabajos.filter((t: any) => !['Entregado','Cancelado'].includes(t.estado) && (t.local_trabajo === 'Local Mercedes' || t.local_trabajo === 'Almacén Mercedes')).length,
+    calle8:   trabajos.filter((t: any) => !['Entregado','Cancelado'].includes(t.estado) && t.local_trabajo === 'Local Calle 8').length,
   };
 
-  // De la casa activos
-  const delaCasa = trabajos.filter((t: any) => t.origen === 'De la casa' && !['Entregado','Cancelado'].includes(t.estado)).length;
 
   const estadoData = [
     { name: 'Pendiente', value: trabajos.filter((t: any) => t.estado === 'Pendiente').length },
@@ -131,7 +130,7 @@ export default function Dashboard() {
         <Card className="stat-card">
           <CardContent className="p-0">
             <div className="flex items-start justify-between">
-              <div><p className="text-xs text-muted-foreground font-medium">Local Calle 8</p><p className="text-2xl font-bold mt-1">{porLocal.calle8}</p><p className="text-xs text-muted-foreground">trabajos</p></div>
+              <div><p className="text-xs text-muted-foreground font-medium">Taller</p><p className="text-2xl font-bold mt-1">{porLocal.taller}</p><p className="text-xs text-muted-foreground">trabajos</p></div>
               <MapPin className="h-5 w-5 text-blue-500 shrink-0" />
             </div>
           </CardContent>
@@ -147,8 +146,8 @@ export default function Dashboard() {
         <Card className="stat-card">
           <CardContent className="p-0">
             <div className="flex items-start justify-between">
-              <div><p className="text-xs text-muted-foreground font-medium">De la casa</p><p className="text-2xl font-bold mt-1 text-orange-600">{delaCasa}</p><p className="text-xs text-muted-foreground">en proceso</p></div>
-              <Home className="h-5 w-5 text-orange-500 shrink-0" />
+              <div><p className="text-xs text-muted-foreground font-medium">Local Calle 8</p><p className="text-2xl font-bold mt-1">{porLocal.calle8}</p><p className="text-xs text-muted-foreground">trabajos</p></div>
+              <MapPin className="h-5 w-5 text-orange-500 shrink-0" />
             </div>
           </CardContent>
         </Card>
