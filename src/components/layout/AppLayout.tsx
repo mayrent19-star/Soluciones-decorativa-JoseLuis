@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Menu, LayoutDashboard, Users, Briefcase, UserCheck, Package, Wallet, FileBarChart, Settings, FileText, TrendingUp, Truck, LogOut, Megaphone, ShoppingBag, Calendar, Bell, Shield } from 'lucide-react';
+import { Menu, LayoutDashboard, Users, Briefcase, UserCheck, Package, Wallet, FileBarChart, Settings, FileText, TrendingUp, Truck, LogOut, Megaphone, ShoppingBag, Calendar, Bell, Shield, ArrowLeftRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { cn } from '@/lib/utils';
@@ -21,6 +21,7 @@ const allNavItems = [
   { path: '/kpis',          label: 'KPIs',          icon: TrendingUp,      ownerOnly: true,  modulo: 'kpis' },
   { path: '/reportes',      label: 'Reportes',      icon: FileBarChart,    ownerOnly: true,  modulo: 'reportes' },
   { path: '/ofertas',       label: 'Ofertas',       icon: Megaphone,       ownerOnly: true,  modulo: 'ofertas' },
+  { path: '/traslados',     label: 'Traslados',     icon: ArrowLeftRight,  ownerOnly: true,  modulo: null },
   { path: '/auditoria',     label: 'Auditoría',     icon: Shield,          ownerOnly: true,  modulo: null },
   { path: '/configuracion', label: 'Configuración', icon: Settings,        ownerOnly: true,  modulo: null },
 ];
