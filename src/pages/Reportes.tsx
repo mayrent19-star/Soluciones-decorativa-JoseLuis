@@ -133,7 +133,7 @@ export default function Reportes() {
   const [empId, setEmpId] = useState('todos');
   const [estadoFilter, setEstadoFilter] = useState('todos');
   const [ubicacionFilter, setUbicacionFilter] = useState('todas');
-  const ubicaciones = ['Almacén Casa', 'Local Mercede', 'Local Calle 8', 'Telas', 'Almacén Taller'];
+  const ubicaciones = ['Almacén Casa', 'Local Mercedes', 'Local Calle 8', 'Telas', 'Almacén Taller'];
 
   const [empleados,    setEmpleados]    = useState<any[]>([]);
   const [asignaciones, setAsignaciones] = useState<any[]>([]);
@@ -143,14 +143,18 @@ export default function Reportes() {
   const [movInv,       setMovInv]       = useState<any[]>([]);
   const [clientes,     setClientes]     = useState<any[]>([]);
 
+  const [invCasa, setInvCasa] = useState<any[]>([]);
+
   useEffect(() => {
+    const sb = (window as any).__supabase || (globalThis as any).__sb;
     Promise.all([
       fetchAll('empleados'), fetchAll('trabajo_empleados'), fetchAll('trabajos'),
       fetchAll('caja_movimientos'), fetchAll('inventario'), fetchAll('inventario_movimientos'),
-      fetchAll('clientes'),
-    ]).then(([e, a, t, c, inv, m, cl]) => {
+      fetchAll('clientes'), fetchAll('inventario_casa'),
+    ]).then(([e, a, t, c, inv, m, cl, ic]) => {
       setEmpleados(e); setAsignaciones(a); setTrabajos(t);
       setCaja(c); setInventario(inv); setMovInv(m); setClientes(cl);
+      setInvCasa(ic || []);
     });
   }, []);
 
@@ -527,36 +531,89 @@ export default function Reportes() {
                 m.tipo_movimiento === 'Salida'
               );
 
+              // Inventario casa en esta ubicación
+              const casaUbic = ubicacionFilter === 'todas'
+                ? invCasa
+                : invCasa.filter((p: any) => p.ubicacion === ubicacionFilter);
+
+              // Trabajos activos en este local
+              const trabajosUbic = ubicacionFilter === 'todas'
+                ? trabajos.filter((t: any) => !['Entregado','Cancelado'].includes(t.estado))
+                : trabajos.filter((t: any) => !['Entregado','Cancelado'].includes(t.estado) && t.local_trabajo === ubicacionFilter);
+
               const imprimirHoja = () => {
-                const filas = itemsUbic.map((i: any) => `
+                const filasMateria = itemsUbic.map((i: any) => `
                   <tr style="border-bottom:1px solid #eee">
-                    <td style="padding:8px 12px;font-size:11px;color:#888">${i.sku || '—'}</td>
-                    <td style="padding:8px 12px">${i.nombre_item}</td>
-                    <td style="padding:8px 12px;text-align:center">${i.categoria}</td>
-                    <td style="padding:8px 12px;text-align:center">${i.unidad}</td>
-                    <td style="padding:8px 12px;text-align:center;font-weight:bold">${i.stock_actual ?? 0}</td>
-                    <td style="padding:8px 12px;text-align:right">${i.costo_unitario ? 'RD$'+i.costo_unitario.toLocaleString('es-DO') : '—'}</td>
-                    <td style="padding:8px 12px;text-align:right;font-weight:bold">${i.costo_unitario && i.stock_actual ? 'RD$'+(i.costo_unitario*i.stock_actual).toLocaleString('es-DO') : '—'}</td>
+                    <td style="padding:6px 8px;width:44px">${i.foto_url
+                      ? `<img src="${i.foto_url}" style="width:40px;height:40px;object-fit:cover;border-radius:4px;border:1px solid #eee" />`
+                      : '<div style="width:40px;height:40px;background:#f1f5f9;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:18px">📦</div>'
+                    }</td>
+                    <td style="padding:6px 8px;font-size:12px"><strong>${i.nombre_item}</strong><br/><span style="color:#888;font-size:10px">${i.categoria} · ${i.sku || ''}</span></td>
+                    <td style="padding:6px 8px;text-align:center;font-size:12px">${i.unidad}</td>
+                    <td style="padding:6px 8px;text-align:center;font-weight:bold;font-size:13px">${i.stock_actual ?? 0}</td>
+                    <td style="padding:6px 8px;text-align:center;color:#ccc;font-size:12px">_______</td>
                   </tr>`).join('');
+
+                const filasInvCasa = casaUbic.map((p: any) => `
+                  <tr style="border-bottom:1px solid #eee;background:#fffbeb">
+                    <td style="padding:6px 8px;width:44px">${p.foto_url
+                      ? `<img src="${p.foto_url}" style="width:40px;height:40px;object-fit:cover;border-radius:4px;border:1px solid #eee" />`
+                      : '<div style="width:40px;height:40px;background:#fef9c3;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:18px">🪑</div>'
+                    }</td>
+                    <td style="padding:6px 8px;font-size:12px"><strong>${p.nombre}</strong><br/><span style="color:#888;font-size:10px">${p.tipo} · ${p.estado}</span>${p.largo || p.ancho ? `<br/><span style="color:#3B82F6;font-size:10px">📐 ${[p.largo,p.ancho,p.profundidad].filter(Boolean).join('×')} pulg</span>` : ''}</td>
+                    <td style="padding:6px 8px;text-align:center;font-size:12px">pieza</td>
+                    <td style="padding:6px 8px;text-align:center;font-weight:bold;font-size:13px">1</td>
+                    <td style="padding:6px 8px;text-align:center;color:#ccc;font-size:12px">_______</td>
+                  </tr>`).join('');
+
+                const filasTrabajos = trabajosUbic.map((t: any) => {
+                  const cli = clientes.find((c: any) => c.id === t.id_cliente);
+                  return `<tr style="border-bottom:1px solid #eee;background:#f0fdf4">
+                    <td style="padding:6px 8px;width:44px"><div style="width:40px;height:40px;background:#dcfce7;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:18px">🔧</div></td>
+                    <td style="padding:6px 8px;font-size:12px"><strong>${t.descripcion_trabajo}</strong><br/><span style="color:#888;font-size:10px">${cli?.nombre_completo || t.nombre_libre || '—'} · ${t.estado}</span></td>
+                    <td style="padding:6px 8px;text-align:center;font-size:12px">trabajo</td>
+                    <td style="padding:6px 8px;text-align:center;font-size:12px">—</td>
+                    <td style="padding:6px 8px;text-align:center;color:#ccc;font-size:12px">_______</td>
+                  </tr>`;
+                }).join('');
+
                 const html = `<!DOCTYPE html><html><head><meta charset="UTF-8">
-                  <title>Inventario ${ubicacionFilter}</title>
-                  <style>body{font-family:Arial,sans-serif;padding:32px;max-width:800px;margin:auto}
-                  h1{color:#185FA5;font-size:18px}h2{color:#64748B;font-size:13px;font-weight:normal}
-                  table{width:100%;border-collapse:collapse}
-                  th{background:#185FA5;color:white;padding:8px 12px;text-align:left;font-size:12px}
-                  td{font-size:12px}.footer{margin-top:24px;font-size:11px;color:#94A3B8;border-top:1px solid #eee;padding-top:12px;display:flex;justify-content:space-between}
-                  .firma{margin-top:40px;display:grid;grid-template-columns:1fr 1fr;gap:32px}
-                  .linea{border-bottom:1px solid #000;height:40px;margin-bottom:6px}p{font-size:11px;color:#64748B;margin:0}
+                  <title>Almacén ${ubicacionFilter}</title>
+                  <style>body{font-family:Arial,sans-serif;padding:28px;max-width:820px;margin:auto}
+                  h1{color:#185FA5;font-size:17px;margin-bottom:2px}h2{color:#64748B;font-size:12px;font-weight:normal;margin-bottom:16px}
+                  table{width:100%;border-collapse:collapse;margin-bottom:20px}
+                  th{background:#185FA5;color:white;padding:7px 8px;text-align:left;font-size:11px}
+                  .section-title{background:#f1f5f9;color:#185FA5;padding:8px 12px;font-size:12px;font-weight:bold;margin-top:16px;margin-bottom:0;border-left:4px solid #185FA5}
+                  .firma{margin-top:36px;display:grid;grid-template-columns:1fr 1fr;gap:40px}
+                  .linea{border-bottom:1px solid #333;height:36px;margin-bottom:5px}p{font-size:11px;color:#64748B;margin:0}
+                  .footer{margin-top:20px;font-size:10px;color:#94A3B8;border-top:1px solid #eee;padding-top:10px;display:flex;justify-content:space-between}
                   </style></head><body>
-                  <h1>Inventario — ${ubicacionFilter === 'todas' ? 'Todas las Ubicaciones' : ubicacionFilter}</h1>
-                  <h2>Soluciones Decorativas José Luis &nbsp;|&nbsp; Fecha: ${new Date().toLocaleDateString('es-DO')}</h2>
-                  <table><thead><tr><th>SKU</th><th>Artículo</th><th>Categoría</th><th>Unidad</th><th>Stock</th><th>Costo Unit.</th><th>Valor Est.</th></tr></thead>
-                  <tbody>${filas}</tbody></table>
+                  <h1>📋 Hoja de Almacén — ${ubicacionFilter === 'todas' ? 'Todas las Ubicaciones' : ubicacionFilter}</h1>
+                  <h2>Soluciones Decorativas José Luis &nbsp;|&nbsp; ${new Date().toLocaleDateString('es-DO', {day:'2-digit',month:'long',year:'numeric'})}</h2>
+
+                  ${itemsUbic.length > 0 ? `
+                  <div class="section-title">📦 Materia Prima (${itemsUbic.length} artículos)</div>
+                  <table><thead><tr><th>Foto</th><th>Artículo</th><th>Unidad</th><th>Stock sistema</th><th>Stock contado</th></tr></thead>
+                  <tbody>${filasMateria}</tbody></table>` : ''}
+
+                  ${casaUbic.length > 0 ? `
+                  <div class="section-title">🪑 Inventario Casa (${casaUbic.length} piezas)</div>
+                  <table><thead><tr><th>Foto</th><th>Pieza</th><th>Tipo</th><th>Estado</th><th>Verificado</th></tr></thead>
+                  <tbody>${filasInvCasa}</tbody></table>` : ''}
+
+                  ${trabajosUbic.length > 0 ? `
+                  <div class="section-title">🔧 Trabajos activos (${trabajosUbic.length})</div>
+                  <table><thead><tr><th>Foto</th><th>Trabajo</th><th>Tipo</th><th>—</th><th>Verificado</th></tr></thead>
+                  <tbody>${filasTrabajos}</tbody></table>` : ''}
+
                   <div class="firma">
-                    <div><div class="linea"></div><p>Encargado de almacén</p></div>
-                    <div><div class="linea"></div><p>Gerencia</p></div>
+                    <div><div class="linea"></div><p>Encargado del almacén</p></div>
+                    <div><div class="linea"></div><p>Gerencia / Supervisor</p></div>
                   </div>
-                  <div class="footer"><span>Total artículos: ${itemsUbic.length}</span><span>Imprimir y plastificar — Soluciones Decorativas JL</span></div>
+                  <div class="footer">
+                    <span>Total: ${itemsUbic.length} mat. prima · ${casaUbic.length} piezas · ${trabajosUbic.length} trabajos</span>
+                    <span>Soluciones Decorativas José Luis</span>
+                  </div>
                   </body></html>`;
                 const w = window.open('', '_blank');
                 if (w) { w.document.write(html); w.document.close(); setTimeout(() => w.print(), 400); }
@@ -627,6 +684,48 @@ export default function Reportes() {
                       </TableBody>
                     </Table>
                   </div>
+
+                  {/* Inventario Casa en esta ubicación */}
+                  {casaUbic.length > 0 && (
+                    <>
+                      <p className="text-sm font-semibold text-muted-foreground pt-2">🪑 Inventario Casa ({casaUbic.length})</p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {casaUbic.map((p: any) => (
+                          <div key={p.id} className="flex gap-2 p-2.5 rounded-lg border bg-amber-50/50 dark:bg-amber-950/10">
+                            {p.foto_url
+                              ? <img src={p.foto_url} className="w-12 h-12 object-cover rounded-md border shrink-0" />
+                              : <div className="w-12 h-12 bg-secondary rounded-md flex items-center justify-center text-xl shrink-0">🪑</div>}
+                            <div className="min-w-0">
+                              <p className="text-xs font-semibold truncate">{p.nombre}</p>
+                              <p className="text-xs text-muted-foreground">{p.tipo} · {p.estado}</p>
+                              {(p.largo || p.ancho) && <p className="text-xs text-blue-600">📐 {[p.largo,p.ancho,p.profundidad].filter(Boolean).join('×')} pulg</p>}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  )}
+
+                  {/* Trabajos activos en este local */}
+                  {trabajosUbic.length > 0 && (
+                    <>
+                      <p className="text-sm font-semibold text-muted-foreground pt-2">🔧 Trabajos activos ({trabajosUbic.length})</p>
+                      <div className="space-y-1.5">
+                        {trabajosUbic.map((t: any) => {
+                          const cli = clientes.find((c: any) => c.id === t.id_cliente);
+                          return (
+                            <div key={t.id} className="flex items-center gap-2 p-2.5 rounded-lg border bg-green-50/50 dark:bg-green-950/10 text-xs">
+                              <span className="text-base">🔧</span>
+                              <div className="flex-1 min-w-0">
+                                <p className="font-medium truncate">{t.descripcion_trabajo}</p>
+                                <p className="text-muted-foreground">{cli?.nombre_completo || t.nombre_libre || '—'} · {t.estado}</p>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </>
+                  )}
 
                   {/* Salidas de ese almacén */}
                   {movUbic.length > 0 && (
