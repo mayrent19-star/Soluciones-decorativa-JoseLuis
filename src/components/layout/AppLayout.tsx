@@ -20,7 +20,6 @@ const allNavItems = [
   { path: '/caja',          label: 'Caja Chica',    icon: Wallet,          ownerOnly: true,  modulo: 'caja' },
   { path: '/kpis',          label: 'KPIs',          icon: TrendingUp,      ownerOnly: true,  modulo: 'kpis' },
   { path: '/reportes',      label: 'Reportes',      icon: FileBarChart,    ownerOnly: true,  modulo: 'reportes' },
-  { path: '/calendario',    label: 'Calendario',    icon: Calendar,        ownerOnly: false, modulo: 'calendario' },
   { path: '/ofertas',       label: 'Ofertas',       icon: Megaphone,       ownerOnly: true,  modulo: 'ofertas' },
   { path: '/auditoria',     label: 'Auditoría',     icon: Shield,          ownerOnly: true,  modulo: null },
   { path: '/configuracion', label: 'Configuración', icon: Settings,        ownerOnly: true,  modulo: null },
@@ -31,7 +30,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { pathname } = useLocation();
   const { isOwner, signOut } = useAuth();
   const { tieneAcceso, loading: permisosLoading } = usePermisos();
-  const { notificaciones, noLeidas, marcarLeida, marcarTodasLeidas } = useNotificaciones();
+  const { notificaciones = [], noLeidas = 0, marcarLeida, marcarTodasLeidas } = useNotificaciones() || {};
   const [campanaOpen, setCampanaOpen] = useState(false);
 
   const navItems = allNavItems.filter(item => {
