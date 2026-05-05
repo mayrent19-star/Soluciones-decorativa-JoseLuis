@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { DollarSign, Briefcase, Sunrise, Sunset, AlertTriangle, MapPin, ShoppingBag } from 'lucide-react';
+import { DollarSign, Briefcase, Sunrise, Sunset, AlertTriangle, ShoppingBag } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { formatCurrency, formatDate } from '@/utils/helpers';
 import { useAuth } from '@/hooks/useAuth';
@@ -71,6 +71,13 @@ export default function Dashboard() {
   };
 
 
+  // Trabajos del día
+  const enProcesoHoy   = trabajos.filter((t: any) => t.estado === 'En proceso'  && t.updated_at?.slice(0,10) === hoy);
+  const finalizadosHoy = trabajos.filter((t: any) => t.estado === 'Finalizado'  && t.fecha_finalizado === hoy);
+  const entregadosHoy  = trabajos.filter((t: any) => t.estado === 'Entregado'   && t.updated_at?.slice(0,10) === hoy);
+
+  const clienteNombre = (t: any) => t.clientes?.nombre_completo || t.nombre_libre || 'Sin cliente';
+
   const estadoData = [
     { name: 'Pendiente', value: trabajos.filter((t: any) => t.estado === 'Pendiente').length },
     { name: 'En proceso', value: trabajos.filter((t: any) => t.estado === 'En proceso').length },
@@ -125,29 +132,96 @@ export default function Dashboard() {
         <Card className="stat-card"><CardContent className="p-0"><div className="flex items-start justify-between"><div><p className="text-xs text-muted-foreground font-medium">Trabajos Activos</p><p className="text-xl lg:text-2xl font-bold mt-1">{enProceso}</p></div><Briefcase className="h-5 w-5 text-primary shrink-0" /></div></CardContent></Card>
       </div>
 
-      {/* Trabajos por local */}
-      <div className="grid grid-cols-3 gap-3">
-        <Card className="stat-card">
-          <CardContent className="p-0">
-            <div className="flex items-start justify-between">
-              <div><p className="text-xs text-muted-foreground font-medium">Taller</p><p className="text-2xl font-bold mt-1">{porLocal.taller}</p><p className="text-xs text-muted-foreground">trabajos</p></div>
-              <MapPin className="h-5 w-5 text-blue-500 shrink-0" />
+      {/* Trabajos del día + por local */}
+      <div className="grid lg:grid-cols-2 gap-4">
+        {/* Actividad del día */}
+        <Card>
+          <CardContent className="p-4 space-y-3">
+            <h3 className="text-sm font-semibold">📅 Actividad de hoy</h3>
+
+            {/* En proceso hoy */}
+            <div>
+              <div className="flex items-center gap-2 mb-1.5">
+                <span className="w-2 h-2 rounded-full bg-blue-500 shrink-0" />
+                <p className="text-xs font-medium text-muted-foreground">En proceso hoy ({enProcesoHoy.length})</p>
+              </div>
+              {enProcesoHoy.length === 0
+                ? <p className="text-xs text-muted-foreground pl-4">Ninguno iniciado hoy</p>
+                : <div className="space-y-1 pl-4">
+                    {enProcesoHoy.map((t: any) => (
+                      <div key={t.id} className="flex items-center justify-between text-xs p-1.5 rounded-lg bg-blue-50 dark:bg-blue-950/20">
+                        <span className="font-medium truncate">{t.descripcion_trabajo}</span>
+                        <span className="text-muted-foreground shrink-0 ml-2">{clienteNombre(t)}</span>
+                      </div>
+                    ))}
+                  </div>
+              }
+            </div>
+
+            {/* Finalizados hoy */}
+            <div>
+              <div className="flex items-center gap-2 mb-1.5">
+                <span className="w-2 h-2 rounded-full bg-green-500 shrink-0" />
+                <p className="text-xs font-medium text-muted-foreground">Finalizados hoy ({finalizadosHoy.length})</p>
+              </div>
+              {finalizadosHoy.length === 0
+                ? <p className="text-xs text-muted-foreground pl-4">Ninguno finalizado hoy</p>
+                : <div className="space-y-1 pl-4">
+                    {finalizadosHoy.map((t: any) => (
+                      <div key={t.id} className="flex items-center justify-between text-xs p-1.5 rounded-lg bg-green-50 dark:bg-green-950/20">
+                        <span className="font-medium truncate">{t.descripcion_trabajo}</span>
+                        <span className="text-muted-foreground shrink-0 ml-2">{clienteNombre(t)}</span>
+                      </div>
+                    ))}
+                  </div>
+              }
+            </div>
+
+            {/* Entregados hoy */}
+            <div>
+              <div className="flex items-center gap-2 mb-1.5">
+                <span className="w-2 h-2 rounded-full bg-emerald-600 shrink-0" />
+                <p className="text-xs font-medium text-muted-foreground">Entregados hoy ({entregadosHoy.length})</p>
+              </div>
+              {entregadosHoy.length === 0
+                ? <p className="text-xs text-muted-foreground pl-4">Ninguno entregado hoy</p>
+                : <div className="space-y-1 pl-4">
+                    {entregadosHoy.map((t: any) => (
+                      <div key={t.id} className="flex items-center justify-between text-xs p-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/20">
+                        <span className="font-medium truncate">{t.descripcion_trabajo}</span>
+                        <span className="text-muted-foreground shrink-0 ml-2">{clienteNombre(t)}</span>
+                      </div>
+                    ))}
+                  </div>
+              }
             </div>
           </CardContent>
         </Card>
-        <Card className="stat-card">
-          <CardContent className="p-0">
-            <div className="flex items-start justify-between">
-              <div><p className="text-xs text-muted-foreground font-medium">Local Mercedes</p><p className="text-2xl font-bold mt-1">{porLocal.mercedes}</p><p className="text-xs text-muted-foreground">trabajos</p></div>
-              <MapPin className="h-5 w-5 text-purple-500 shrink-0" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="stat-card">
-          <CardContent className="p-0">
-            <div className="flex items-start justify-between">
-              <div><p className="text-xs text-muted-foreground font-medium">Local Calle 8</p><p className="text-2xl font-bold mt-1">{porLocal.calle8}</p><p className="text-xs text-muted-foreground">trabajos</p></div>
-              <MapPin className="h-5 w-5 text-orange-500 shrink-0" />
+
+        {/* Por local */}
+        <Card>
+          <CardContent className="p-4 space-y-3">
+            <h3 className="text-sm font-semibold">📍 Trabajos activos por local</h3>
+            {[
+              { label: 'Taller', count: porLocal.taller, color: 'bg-blue-500' },
+              { label: 'Local Mercedes', count: porLocal.mercedes, color: 'bg-purple-500' },
+              { label: 'Local Calle 8', count: porLocal.calle8, color: 'bg-orange-500' },
+            ].map(({ label, count, color }) => (
+              <div key={label} className="flex items-center gap-3">
+                <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${color}`} />
+                <span className="text-sm flex-1">{label}</span>
+                <div className="flex items-center gap-2">
+                  <div className="h-2 bg-secondary rounded-full w-24 overflow-hidden">
+                    <div className={`h-full rounded-full ${color}`}
+                      style={{ width: `${enProceso > 0 ? Math.min(100, (count / enProceso) * 100) : 0}%` }} />
+                  </div>
+                  <span className="text-sm font-bold w-4 text-right">{count}</span>
+                </div>
+              </div>
+            ))}
+            <div className="pt-2 border-t text-xs text-muted-foreground flex justify-between">
+              <span>Total activos</span>
+              <span className="font-semibold text-foreground">{enProceso}</span>
             </div>
           </CardContent>
         </Card>

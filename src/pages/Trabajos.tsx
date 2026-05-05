@@ -103,6 +103,7 @@ export default function Trabajos() {
   const [search, setSearch]     = useState('');
   const [estadoFilter, setEstadoFilter] = useState('todos');
   const [origenFilter, setOrigenFilter] = useState('todos');
+  const [hoyFilter, setHoyFilter] = useState(false);
   const [dialogOpen, setDialogOpen]     = useState(false);
   const [form, setForm]                 = useState<any>(empty);
   const [deleteId, setDeleteId]         = useState<string | null>(null);
@@ -110,6 +111,7 @@ export default function Trabajos() {
 
   // Estado rápido — confirmar avance
   const [quickEstado, setQuickEstado] = useState<{ id: string; de: string; para: string } | null>(null);
+  const [facturaModal, setFacturaModal] = useState<{ id: string; descripcion: string } | null>(null);
 
   // Calendario
   const hoy = new Date();
@@ -163,7 +165,8 @@ export default function Trabajos() {
       clienteNombre(i.id_cliente).toLowerCase().includes(search.toLowerCase());
     const me = estadoFilter === 'todos' || i.estado === estadoFilter;
     const mo = origenFilter === 'todos' || (i.origen || 'Cliente') === origenFilter;
-    return ms && me && mo;
+    const mh = !hoyFilter || i.updated_at?.slice(0,10) === new Date().toISOString().slice(0,10);
+    return ms && me && mo && mh;
   });
 
   // ── Cambio rápido de estado desde la lista ──
@@ -296,6 +299,10 @@ export default function Trabajos() {
                 <SelectItem value="De la casa">🏠 De la casa</SelectItem>
               </SelectContent>
             </Select>
+            <button onClick={() => setHoyFilter(!hoyFilter)}
+              className={`px-3 py-2 rounded-lg border text-xs font-medium transition-colors shrink-0 ${hoyFilter ? 'bg-primary text-primary-foreground border-primary' : 'bg-card border-border hover:bg-secondary'}`}>
+              📅 Hoy
+            </button>
           </div>
 
           <div className="border rounded-lg overflow-x-auto bg-card">
@@ -326,7 +333,13 @@ export default function Trabajos() {
                         {/* Badge clicable si tiene siguiente estado */}
                         {isOwner && siguiente ? (
                           <button
-                            onClick={() => setQuickEstado({ id: t.id, de: t.estado, para: siguiente })}
+                            onClick={() => {
+                        if (siguiente === 'Finalizado') {
+                          setFacturaModal({ id: t.id, descripcion: t.descripcion_trabajo });
+                        } else {
+                          setQuickEstado({ id: t.id, de: t.estado, para: siguiente });
+                        }
+                      }}
                             className={`inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full font-medium transition-opacity hover:opacity-70 cursor-pointer ${estadoColor[t.estado]}`}
                             title={`Click para marcar como "${siguiente}"`}>
                             {t.estado}
@@ -595,7 +608,37 @@ export default function Trabajos() {
         </DialogContent>
       </Dialog>
 
-      {/* ── CONFIRMAR CAMBIO RÁPIDO DE ESTADO ── */}
+      {/* ── MODAL IMPRIMIR FACTURA AL FINALIZAR ── */}
+      <AlertDialog open={!!facturaModal} onOpenChange={() => setFacturaModal(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Imprimir factura?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Vas a marcar <strong>{facturaModal?.descripcion}</strong> como Finalizado. ¿Deseas imprimir la factura primero?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <Button variant="outline" onClick={async () => {
+              if (facturaModal) {
+                await updateRow('trabajos', facturaModal.id, { estado: 'Finalizado', fecha_finalizado: new Date().toISOString().slice(0, 10) });
+                reload(); setFacturaModal(null);
+                toast({ title: '✅ Trabajo finalizado' });
+              }
+            }}>No, solo finalizar</Button>
+            <AlertDialogAction onClick={async () => {
+              if (facturaModal) {
+                await updateRow('trabajos', facturaModal.id, { estado: 'Finalizado', fecha_finalizado: new Date().toISOString().slice(0, 10) });
+                reload(); setFacturaModal(null);
+                toast({ title: '✅ Trabajo finalizado' });
+                window.open(`/trabajos/${facturaModal.id}`, '_blank');
+              }
+            }}>🧾 Sí, abrir factura</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* ── CONFIRMAR CAMBIO RÁPIDO DE ESTADO ── */}}
       <AlertDialog open={!!quickEstado} onOpenChange={() => setQuickEstado(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
