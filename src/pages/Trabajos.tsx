@@ -638,7 +638,7 @@ export default function Trabajos() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* ── CONFIRMAR CAMBIO RÁPIDO DE ESTADO ── */}}
+      {/* ── CONFIRMAR CAMBIO RÁPIDO DE ESTADO ── */}
       <AlertDialog open={!!quickEstado} onOpenChange={() => setQuickEstado(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
