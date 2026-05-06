@@ -25,6 +25,7 @@ import Auditoria from "./pages/Auditoria";
 import Traslados from "./pages/Traslados";
 import Ofertas from "./pages/Ofertas";
 import NotFound from "./pages/NotFound";
+import CatalogoPublico from "./pages/CatalogoPublico";
 
 // ✅ FIX 1: QueryClient con configuración correcta
 // staleTime evita re-fetches innecesarios al cambiar de pestaña
@@ -84,6 +85,7 @@ const App = () => (
             <Route path="/traslados"     element={<P ownerOnly><Traslados /></P>} />
             <Route path="/ofertas"       element={<P ownerOnly><Ofertas /></P>} />
             <Route path="/configuracion" element={<P ownerOnly><Configuracion /></P>} />
+            <Route path="/catalogo-publico" element={<CatalogoPublico />} />
             <Route path="*"              element={<NotFound />} />
           </Routes>
         </BrowserRouter>

@@ -31,7 +31,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { pathname } = useLocation();
   const { isOwner, signOut } = useAuth();
   const { tieneAcceso, loading: permisosLoading } = usePermisos();
-  const { notificaciones = [], noLeidas = 0, marcarLeida, marcarTodasLeidas } = useNotificaciones() || {};
+  const { notifs: notificaciones = [], noLeidas = 0, marcarLeida, marcarTodasLeidas } = useNotificaciones() || {};
   const [campanaOpen, setCampanaOpen] = useState(false);
 
   const navItems = allNavItems.filter(item => {
