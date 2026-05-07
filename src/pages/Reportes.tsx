@@ -131,6 +131,7 @@ export default function Reportes() {
   const [desde, setDesde] = useState('');
   const [hasta, setHasta] = useState('');
   const [empId, setEmpId] = useState('todos');
+  const [invFiltroItem, setInvFiltroItem] = useState('');
   const [estadoFilter, setEstadoFilter] = useState('todos');
   const [ubicacionFilter, setUbicacionFilter] = useState('todas');
   const ubicaciones = ['Almacén Casa', 'Local Mercedes', 'Local Calle 8', 'Telas', 'Almacén Taller'];
@@ -484,7 +485,7 @@ export default function Reportes() {
 
             {/* Filtro por artículo */}
             <div className="flex gap-3 flex-wrap">
-              <Select value={(invFiltroItem as string) || 'todos'} onValueChange={v => (setInvFiltroItem as any)(v === 'todos' ? '' : v)}>
+              <Select value={invFiltroItem || 'todos'} onValueChange={v => setInvFiltroItem(v === 'todos' ? '' : v)}>
                 <SelectTrigger className="flex-1 min-w-[180px]"><SelectValue placeholder="Todos los artículos" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="todos">Todos los artículos</SelectItem>

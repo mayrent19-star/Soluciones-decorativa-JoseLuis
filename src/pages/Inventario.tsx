@@ -223,14 +223,16 @@ export default function Inventario() {
     }
     const item = items.find((i: any) => i.id === movForm.id_item);
     if (!item) return;
-    const stockActual = item.stock_actual ?? 0;
+    // Leer stock actual directo de Supabase para evitar datos desactualizados
+    const { data: itemFresh } = await db.from('inventario').select('stock_actual').eq('id', item.id).single();
+    const stockActual = itemFresh?.stock_actual ?? item.stock_actual ?? 0;
     if (movForm.tipo_movimiento === 'Salida' && stockActual < cantidad) {
-      toast({ title: `Stock insuficiente. Disponible: ${stockActual}`, variant: 'destructive' }); return;
+      toast({ title: `Stock insuficiente. Disponible: ${stockActual} ${item.unidad}`, variant: 'destructive' }); return;
     }
     const newStock = movForm.tipo_movimiento === 'Entrada'
       ? stockActual + cantidad
       : stockActual - cantidad;
-    await updateRow('inventario', item.id, { stock_actual: newStock });
+    await db.from('inventario').update({ stock_actual: newStock }).eq('id', item.id);
     const movData: any = {
       id_item:          movForm.id_item,
       tipo_movimiento:  movForm.tipo_movimiento,
