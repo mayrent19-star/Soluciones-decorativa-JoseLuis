@@ -241,23 +241,8 @@ export default function Inventario() {
       asignado_a:       movForm.asignado_a || null,
     };
     await insertRow('inventario_movimientos', movData);
-    // Si es salida, preparar hoja de impresión
-    if (movForm.tipo_movimiento === 'Salida') {
-      const trabajo = trabajos.find((t: any) => t.id === movForm.id_trabajo);
-      setHojaImpresion({
-        numero:    `SAL-${Date.now().toString().slice(-4)}`,
-        fecha:     movForm.fecha,
-        item:      item.nombre_item,
-        unidad:    item.unidad,
-        ubicacion: item.ubicacion || 'Sin ubicación',
-        cantidad,
-        motivo:    movForm.motivo || '—',
-        trabajo:   trabajo?.descripcion_trabajo || null,
-        asignado_a: movForm.asignado_a || '—',
-      });
-    }
     reload(); setMovDialog(false); setMovForm(emptyMov); setMovSearch('');
-    toast({ title: `${movForm.tipo_movimiento} registrada` });
+    toast({ title: `✅ ${movForm.tipo_movimiento} registrada — ${cantidad} ${item.unidad} de ${item.nombre_item}` });
   };
 
   // ════════════════════════════════════════════════
@@ -1041,7 +1026,16 @@ export default function Inventario() {
               </Select>
             </div>
             <div className="grid grid-cols-2 gap-4">
-              <div className="grid gap-1.5"><Label className="text-xs">Cantidad *</Label><Input type="text" inputMode="numeric" value={movForm.cantidad === 0 ? '' : movForm.cantidad} onChange={e => { const v = e.target.value.replace(/[^0-9]/g,''); setMovForm({ ...movForm, cantidad: v === '' ? 0 : parseInt(v) || 0 }); }} placeholder="0" /></div>
+              <div className="grid gap-1.5">
+                <Label className="text-xs">
+                  Cantidad {(() => { const it = items.find((i: any) => i.id === movForm.id_item); return it ? <span className="text-muted-foreground font-normal">({it.unidad})</span> : null; })()}
+                </Label>
+                <Input type="text" inputMode="numeric"
+                  value={movForm.cantidad === 0 ? '' : movForm.cantidad}
+                  onChange={e => { const v = e.target.value.replace(/[^0-9.]/g,''); setMovForm({ ...movForm, cantidad: v === '' ? 0 : parseFloat(v) || 0 }); }}
+                  placeholder={(() => { const it = items.find((i: any) => i.id === movForm.id_item); return it ? `0 ${it.unidad}` : '0'; })()}
+                />
+              </div>
               <div className="grid gap-1.5"><Label className="text-xs">Fecha</Label><Input type="date" value={movForm.fecha} onChange={e => setMovForm({ ...movForm, fecha: e.target.value })} /></div>
             </div>
             <div className="grid gap-1.5"><Label className="text-xs">Motivo</Label><Input value={movForm.motivo || ''} onChange={e => setMovForm({ ...movForm, motivo: e.target.value })} /></div>
@@ -1050,8 +1044,16 @@ export default function Inventario() {
             )}
             <div className="grid gap-1.5"><Label className="text-xs">Trabajo (opcional)</Label>
               <Select value={movForm.id_trabajo || 'ninguno'} onValueChange={v => setMovForm({ ...movForm, id_trabajo: v === 'ninguno' ? null : v })}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent><SelectItem value="ninguno">Ninguno</SelectItem>{trabajos.map((t: any) => <SelectItem key={t.id} value={t.id}>{t.descripcion_trabajo}</SelectItem>)}</SelectContent>
+                <SelectTrigger><SelectValue placeholder="Seleccionar trabajo..." /></SelectTrigger>
+                <SelectContent>
+                  <div className="px-2 py-1 sticky top-0 bg-popover z-10">
+                    <Input placeholder="Buscar trabajo..." className="h-7 text-xs"
+                      onChange={e => { const val = e.target.value.toLowerCase(); }}
+                      onClick={e => e.stopPropagation()} />
+                  </div>
+                  <SelectItem value="ninguno">Ninguno</SelectItem>
+                  {trabajos.filter((t: any) => !['Entregado','Cancelado'].includes(t.estado)).map((t: any) => <SelectItem key={t.id} value={t.id}>{t.descripcion_trabajo}</SelectItem>)}
+                </SelectContent>
               </Select>
             </div>
           </div>
