@@ -239,6 +239,8 @@ export default function Inventario() {
       fecha:            movForm.fecha,
       id_trabajo:       movForm.id_trabajo || null,
       asignado_a:       movForm.asignado_a || null,
+      stock_antes:      stockActual,
+      stock_despues:    newStock,
     };
     await insertRow('inventario_movimientos', movData);
     reload(); setMovDialog(false); setMovForm(emptyMov); setMovSearch('');

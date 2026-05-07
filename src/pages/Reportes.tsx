@@ -481,27 +481,87 @@ export default function Reportes() {
         <TabsContent value="inventario" className="mt-4">
           <Card><CardContent className="p-5 space-y-4">
             <DateFilters desde={desde} hasta={hasta} setDesde={setDesde} setHasta={setHasta} />
-            <ExportBtns onExcel={handleInvExcel} onPDF={handleInvPDF} />
+
+            {/* Filtro por artículo */}
+            <div className="flex gap-3 flex-wrap">
+              <Select value={(invFiltroItem as string) || 'todos'} onValueChange={v => (setInvFiltroItem as any)(v === 'todos' ? '' : v)}>
+                <SelectTrigger className="flex-1 min-w-[180px]"><SelectValue placeholder="Todos los artículos" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todos los artículos</SelectItem>
+                  {inventario.map((i: any) => <SelectItem key={i.id} value={i.id}>{i.nombre_item}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <ExportBtns onExcel={handleInvExcel} onPDF={handleInvPDF} />
+            </div>
+
+            {/* Resumen entradas/salidas */}
+            {(() => {
+              const filtrado = invFilt.filter((m: any) => !invFiltroItem || m.id_item === invFiltroItem);
+              const entradas = filtrado.filter((m: any) => m.tipo_movimiento === 'Entrada').reduce((s: number, m: any) => s + (m.cantidad || 0), 0);
+              const salidas  = filtrado.filter((m: any) => m.tipo_movimiento === 'Salida').reduce((s: number, m: any) => s + (m.cantidad || 0), 0);
+              return (
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="rounded-xl border bg-green-50 dark:bg-green-950/20 p-3 text-center">
+                    <p className="text-xs text-muted-foreground">Total entradas</p>
+                    <p className="text-xl font-bold text-green-600">+{entradas}</p>
+                  </div>
+                  <div className="rounded-xl border bg-red-50 dark:bg-red-950/20 p-3 text-center">
+                    <p className="text-xs text-muted-foreground">Total salidas</p>
+                    <p className="text-xl font-bold text-destructive">-{salidas}</p>
+                  </div>
+                </div>
+              );
+            })()}
 
             <div className="border rounded-lg overflow-x-auto">
               <Table>
                 <TableHeader><TableRow>
-                  <TableHead>Artículo</TableHead><TableHead>Tipo</TableHead>
-                  <TableHead className="text-right">Cant.</TableHead>
-                  <TableHead className="hidden sm:table-cell">Motivo</TableHead>
                   <TableHead>Fecha</TableHead>
+                  <TableHead>Artículo</TableHead>
+                  <TableHead>Tipo</TableHead>
+                  <TableHead className="text-right">Cant.</TableHead>
+                  <TableHead className="text-right hidden md:table-cell">Antes</TableHead>
+                  <TableHead className="text-right hidden md:table-cell">Después</TableHead>
+                  <TableHead className="hidden sm:table-cell">Asignado a</TableHead>
+                  <TableHead className="hidden lg:table-cell">Motivo</TableHead>
+                  <TableHead className="hidden lg:table-cell">Trabajo</TableHead>
                 </TableRow></TableHeader>
                 <TableBody>
-                  {invFilt.length === 0 && <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-6">Sin datos</TableCell></TableRow>}
-                  {invFilt.map((m: any) => (
-                    <TableRow key={m.id}>
-                      <TableCell className="font-medium">{inventario.find((i: any) => i.id === m.id_item)?.nombre_item || '—'}</TableCell>
-                      <TableCell><Badge variant={m.tipo_movimiento === 'Entrada' ? 'default' : 'destructive'}>{m.tipo_movimiento}</Badge></TableCell>
-                      <TableCell className="text-right">{m.cantidad}</TableCell>
-                      <TableCell className="hidden sm:table-cell text-muted-foreground text-sm">{m.motivo || '—'}</TableCell>
-                      <TableCell className="text-sm">{formatDate(m.fecha)}</TableCell>
-                    </TableRow>
-                  ))}
+                  {invFilt.filter((m: any) => !invFiltroItem || m.id_item === invFiltroItem).length === 0 &&
+                    <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-6">Sin datos</TableCell></TableRow>}
+                  {invFilt
+                    .filter((m: any) => !invFiltroItem || m.id_item === invFiltroItem)
+                    .map((m: any) => {
+                      const item = inventario.find((i: any) => i.id === m.id_item);
+                      const trab = trabajos.find((t: any) => t.id === m.id_trabajo);
+                      return (
+                        <TableRow key={m.id}>
+                          <TableCell className="text-sm whitespace-nowrap">{formatDate(m.fecha)}</TableCell>
+                          <TableCell className="font-medium text-sm">{item?.nombre_item || '—'}</TableCell>
+                          <TableCell>
+                            <Badge variant={m.tipo_movimiento === 'Entrada' ? 'default' : 'destructive'} className="text-xs">
+                              {m.tipo_movimiento === 'Entrada' ? '+' : '-'}{m.tipo_movimiento}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right font-semibold">
+                            <span className={m.tipo_movimiento === 'Entrada' ? 'text-green-600' : 'text-destructive'}>
+                              {m.tipo_movimiento === 'Entrada' ? '+' : '-'}{m.cantidad} {item?.unidad || ''}
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-right hidden md:table-cell text-muted-foreground text-sm">
+                            {m.stock_antes != null ? `${m.stock_antes} ${item?.unidad || ''}` : '—'}
+                          </TableCell>
+                          <TableCell className="text-right hidden md:table-cell font-medium text-sm">
+                            {m.stock_despues != null ? `${m.stock_despues} ${item?.unidad || ''}` : '—'}
+                          </TableCell>
+                          <TableCell className="hidden sm:table-cell text-sm">
+                            {m.asignado_a ? <span className="font-medium">{m.asignado_a}</span> : <span className="text-muted-foreground">—</span>}
+                          </TableCell>
+                          <TableCell className="hidden lg:table-cell text-muted-foreground text-sm">{m.motivo || '—'}</TableCell>
+                          <TableCell className="hidden lg:table-cell text-muted-foreground text-sm">{trab?.descripcion_trabajo || '—'}</TableCell>
+                        </TableRow>
+                      );
+                    })}
                 </TableBody>
               </Table>
             </div>
