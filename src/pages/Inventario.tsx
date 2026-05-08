@@ -248,11 +248,23 @@ export default function Inventario() {
       stock_antes:      stockActual,
       stock_despues:    newStock,
     };
+    // Intentar con todas las columnas primero
     const { error: movError } = await db.from('inventario_movimientos').insert(movData);
     if (movError) {
-      // Si falla por columnas nuevas, intentar sin stock_antes/despues
-      const movDataBasic = { id_item: movData.id_item, tipo_movimiento: movData.tipo_movimiento, cantidad: movData.cantidad, motivo: movData.motivo, fecha: movData.fecha, id_trabajo: movData.id_trabajo, asignado_a: movData.asignado_a };
-      await db.from('inventario_movimientos').insert(movDataBasic);
+      console.error('Error movimiento completo:', movError);
+      // Intentar solo con columnas base que siempre existen
+      const { error: movError2 } = await db.from('inventario_movimientos').insert({
+        id_item:         movForm.id_item,
+        tipo_movimiento: movForm.tipo_movimiento,
+        cantidad,
+        motivo:          movForm.motivo || null,
+        fecha:           movForm.fecha,
+      });
+      if (movError2) {
+        console.error('Error movimiento base:', movError2);
+        toast({ title: 'Error registrando movimiento: ' + movError2.message, variant: 'destructive' });
+        return;
+      }
     }
     reload(); setMovDialog(false); setMovForm(emptyMov); setMovSearch('');
     toast({ title: `✅ ${movForm.tipo_movimiento} registrada — ${cantidad} ${item.unidad} de ${item.nombre_item}` });
