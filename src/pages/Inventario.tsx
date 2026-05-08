@@ -244,7 +244,12 @@ export default function Inventario() {
       stock_antes:      stockActual,
       stock_despues:    newStock,
     };
-    await insertRow('inventario_movimientos', movData);
+    const { error: movError } = await db.from('inventario_movimientos').insert(movData);
+    if (movError) {
+      // Si falla por columnas nuevas, intentar sin stock_antes/despues
+      const movDataBasic = { id_item: movData.id_item, tipo_movimiento: movData.tipo_movimiento, cantidad: movData.cantidad, motivo: movData.motivo, fecha: movData.fecha, id_trabajo: movData.id_trabajo, asignado_a: movData.asignado_a };
+      await db.from('inventario_movimientos').insert(movDataBasic);
+    }
     reload(); setMovDialog(false); setMovForm(emptyMov); setMovSearch('');
     toast({ title: `✅ ${movForm.tipo_movimiento} registrada — ${cantidad} ${item.unidad} de ${item.nombre_item}` });
   };
