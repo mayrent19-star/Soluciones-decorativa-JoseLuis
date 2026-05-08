@@ -19,7 +19,7 @@ import { formatDate } from '@/utils/helpers';
 
 const db = supabase as any;
 
-const locales = ['Taller', 'Local Mercedes', 'Local Calle 8'];
+const locales = ['Taller', 'Local Mercedes', 'Local Calle 8', 'Almacén Casa'];
 const unidades = ['unidad', 'yarda', 'metro', 'pie', 'plancha', 'caja', 'rollo', 'libra', 'lata', 'galón'];
 const estadoColor: Record<string, string> = {
   'En camino':  'bg-blue-100 text-blue-800 dark:bg-blue-900/30',
@@ -46,7 +46,7 @@ export default function Traslados() {
   const [form, setForm] = useState<any>({
     tipo: 'materiales', origen: 'Taller', destino: 'Local Mercedes',
     responsable: '', id_trabajo: '', notas: '',
-    fecha: new Date().toISOString().slice(0, 10),
+    fecha: new Date().toLocaleDateString('en-CA', { timeZone: 'America/Santo_Domingo' }),
   });
   const [items, setItems] = useState<any[]>([{ ...emptyItem }]);
 
@@ -126,7 +126,7 @@ export default function Traslados() {
       }
 
       reload(); setDialogOpen(false);
-      setForm({ tipo: 'materiales', origen: 'Taller', destino: 'Local Mercedes', responsable: '', id_trabajo: '', notas: '', fecha: new Date().toISOString().slice(0, 10) });
+      setForm({ tipo: 'materiales', origen: 'Taller', destino: 'Local Mercedes', responsable: '', id_trabajo: '', notas: '', fecha: new Date().toLocaleDateString('en-CA', { timeZone: 'America/Santo_Domingo' }) });
       setItems([{ ...emptyItem }]);
       toast({ title: '✅ Traslado registrado' });
     } catch (e: any) {

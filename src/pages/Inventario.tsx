@@ -29,7 +29,7 @@ const skuPrefijo: Record<string, string> = {
 const ubicaciones = ['Almacén Casa', 'Local Mercedes', 'Local Calle 8', 'Telas', 'Almacén Taller'];
 const unidades    = ['unidad', 'yarda', 'metro', 'pie', 'galón', 'plancha', 'caja', 'rollo', 'lata', 'libra', 'pulgada'];
 const emptyItem  = { nombre_item: '', categoria: 'Tela', unidad: 'unidad', stock_actual: null as number | null, stock_minimo: null as number | null, costo_unitario: 0, ubicacion: '', sobrante: null as number | null };
-const emptyMov   = { id_item: '', tipo_movimiento: 'Entrada', cantidad: 0, motivo: '', fecha: new Date().toISOString().slice(0, 10), id_trabajo: null, asignado_a: '' };
+const emptyMov   = { id_item: '', tipo_movimiento: 'Entrada', cantidad: 0, motivo: '', fecha: new Date().toLocaleDateString('en-CA', { timeZone: 'America/Santo_Domingo' }), id_trabajo: null, asignado_a: '' };
 
 // ── Muebles / Productos terminados ────────────────────────────
 const emptyMueble = { nombre: '', descripcion: '', precio: 0, stock: 1, disponible: true };
@@ -626,7 +626,7 @@ export default function Inventario() {
                   tipo_movimiento: 'Salida',
                   cantidad,
                   motivo: 'Movido a Inventario Casa',
-                  fecha: new Date().toISOString().slice(0, 10),
+                  fecha: new Date().toLocaleDateString('en-CA', { timeZone: 'America/Santo_Domingo' }),
                 });
                 // Actualizar stock
                 await updateRow('inventario', moverItemDialog.id, {
