@@ -137,12 +137,16 @@ export default function Inventario() {
 
   // ── Carga inicial ──
   const reload = async () => {
-    const [inv, m, t] = await Promise.all([
+    const [inv, t] = await Promise.all([
       fetchAll('inventario', 'nombre_item', true),
-      fetchAll('inventario_movimientos'),
       fetchAll('trabajos'),
     ]);
-    setItems(inv); setMovs(m); setTrabajos(t);
+    const { data: movData } = await db
+      .from('inventario_movimientos')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(500);
+    setItems(inv); setMovs(movData || []); setTrabajos(t);
   };
 
   const reloadMuebles = async () => {
