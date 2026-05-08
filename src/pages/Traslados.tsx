@@ -108,22 +108,38 @@ export default function Traslados() {
           cantidad:     Number(item.cantidad),
           unidad:       item.unidad,
         });
-        // Solo descuenta si el usuario marcó que se consumió (no solo se movió)
-        if (item.id_item && form.tipo === 'materiales' && form.descuenta_stock) {
+        // Siempre actualizar ubicación del artículo al destino
+        if (item.id_item && form.tipo === 'materiales') {
           const { data: invFresh } = await db.from('inventario').select('stock_actual, unidad').eq('id', item.id_item).single();
           if (invFresh) {
-            const stockAntes = invFresh.stock_actual || 0;
-            const stockDespues = Math.max(0, stockAntes - Number(item.cantidad));
-            await db.from('inventario').update({ stock_actual: stockDespues }).eq('id', item.id_item);
-            await db.from('inventario_movimientos').insert({
-              id_item:         item.id_item,
-              tipo_movimiento: 'Salida',
-              cantidad:        Number(item.cantidad),
-              motivo:          `Traslado ${form.origen} → ${form.destino}`,
-              fecha:           form.fecha,
-              stock_antes:     stockAntes,
-              stock_despues:   stockDespues,
-            });
+            if (form.descuenta_stock) {
+              // Consumido: descuenta stock y registra movimiento
+              const stockAntes = invFresh.stock_actual || 0;
+              const stockDespues = Math.max(0, stockAntes - Number(item.cantidad));
+              await db.from('inventario').update({ stock_actual: stockDespues, ubicacion: form.destino }).eq('id', item.id_item);
+              await db.from('inventario_movimientos').insert({
+                id_item:         item.id_item,
+                tipo_movimiento: 'Salida',
+                cantidad:        Number(item.cantidad),
+                motivo:          `Traslado ${form.origen} a ${form.destino}`,
+                fecha:           form.fecha,
+                stock_antes:     stockAntes,
+                stock_despues:   stockDespues,
+              });
+            } else {
+              // Movido: solo actualiza ubicación, no toca el stock
+              await db.from('inventario').update({ ubicacion: form.destino }).eq('id', item.id_item);
+              await db.from('inventario_movimientos').insert({
+                id_item:         item.id_item,
+                tipo_movimiento: 'Salida',
+                cantidad:        Number(item.cantidad),
+                motivo:          `Movido de ${form.origen} a ${form.destino}`,
+                fecha:           form.fecha,
+                stock_antes:     invFresh.stock_actual || 0,
+                stock_despues:   invFresh.stock_actual || 0,
+                asignado_a: `Traslado a ${form.destino}`,
+              });
+            }
           }
         }
       }
