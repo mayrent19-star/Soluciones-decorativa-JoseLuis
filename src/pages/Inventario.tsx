@@ -29,7 +29,7 @@ const skuPrefijo: Record<string, string> = {
 const ubicaciones = ['Almacén Casa', 'Local Mercedes', 'Local Calle 8', 'Telas', 'Almacén Taller'];
 const unidades    = ['unidad', 'yarda', 'metro', 'pie', 'galón', 'plancha', 'caja', 'rollo', 'lata', 'libra', 'pulgada'];
 const emptyItem  = { nombre_item: '', categoria: 'Tela', unidad: 'unidad', stock_actual: null as number | null, stock_minimo: null as number | null, costo_unitario: 0, ubicacion: '', sobrante: null as number | null };
-const emptyMov   = { id_item: '', tipo_movimiento: 'Entrada', cantidad: 0, motivo: '', fecha: new Date().toLocaleDateString('en-CA', { timeZone: 'America/Santo_Domingo' }), id_trabajo: null, asignado_a: '' };
+const emptyMov   = { id_item: '', tipo_movimiento: 'Entrada', cantidad: 0, motivo: '', fecha: '', id_trabajo: null, asignado_a: '' };
 
 // ── Muebles / Productos terminados ────────────────────────────
 const emptyMueble = { nombre: '', descripcion: '', precio: 0, stock: 1, disponible: true };
@@ -242,7 +242,7 @@ export default function Inventario() {
       tipo_movimiento:  movForm.tipo_movimiento,
       cantidad,
       motivo:           movForm.motivo || null,
-      fecha:            movForm.fecha,
+      fecha:            movForm.fecha || new Date().toLocaleDateString('en-CA', { timeZone: 'America/Santo_Domingo' }),
       id_trabajo:       movForm.id_trabajo || null,
       asignado_a:       movForm.asignado_a || null,
       stock_antes:      stockActual,
@@ -360,8 +360,8 @@ export default function Inventario() {
         <TabsContent value="articulos" className="mt-4 space-y-4">
           {isOwner && (
             <div className="flex gap-2 flex-wrap justify-end">
-              <Button variant="outline" onClick={() => { setMovForm({ ...emptyMov, tipo_movimiento: 'Entrada' }); setMovSearch(''); setMovDialog(true); }}><ArrowDownToLine className="h-4 w-4 mr-1" />Entrada</Button>
-              <Button variant="outline" onClick={() => { setMovForm({ ...emptyMov, tipo_movimiento: 'Salida' }); setMovSearch(''); setMovDialog(true); }}><ArrowUpFromLine className="h-4 w-4 mr-1" />Salida</Button>
+              <Button variant="outline" onClick={() => { setMovForm({ ...emptyMov, tipo_movimiento: 'Entrada', fecha: new Date().toLocaleDateString('en-CA', { timeZone: 'America/Santo_Domingo' }) }); setMovSearch(''); setMovDialog(true); }}><ArrowDownToLine className="h-4 w-4 mr-1" />Entrada</Button>
+              <Button variant="outline" onClick={() => { setMovForm({ ...emptyMov, tipo_movimiento: 'Salida', fecha: new Date().toLocaleDateString('en-CA', { timeZone: 'America/Santo_Domingo' }) }); setMovSearch(''); setMovDialog(true); }}><ArrowUpFromLine className="h-4 w-4 mr-1" />Salida</Button>
               <Button onClick={() => { setForm(emptyItem); setFotoFile(null); setFotoPreview(null); setDialogOpen(true); }}><Plus className="h-4 w-4 mr-1" />Nuevo</Button>
             </div>
           )}
@@ -1109,7 +1109,7 @@ export default function Inventario() {
               {isOwner && (
                 <div className="flex gap-2 pt-1">
                   <Button className="flex-1 gap-2 bg-green-600 hover:bg-green-700" onClick={() => {
-                    setMovForm({ ...emptyMov, tipo_movimiento: 'Entrada', id_item: fotoDialog.id });
+                    setMovForm({ ...emptyMov, tipo_movimiento: 'Entrada', id_item: fotoDialog.id, fecha: new Date().toLocaleDateString('en-CA', { timeZone: 'America/Santo_Domingo' }) });
                     setMovSearch('');
                     setFotoDialog(null);
                     setMovDialog(true);
@@ -1117,7 +1117,7 @@ export default function Inventario() {
                     <ArrowDownToLine className="h-4 w-4" />Entrada
                   </Button>
                   <Button variant="destructive" className="flex-1 gap-2" onClick={() => {
-                    setMovForm({ ...emptyMov, tipo_movimiento: 'Salida', id_item: fotoDialog.id });
+                    setMovForm({ ...emptyMov, tipo_movimiento: 'Salida', id_item: fotoDialog.id, fecha: new Date().toLocaleDateString('en-CA', { timeZone: 'America/Santo_Domingo' }) });
                     setMovSearch('');
                     setFotoDialog(null);
                     setMovDialog(true);
