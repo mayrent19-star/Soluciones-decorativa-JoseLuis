@@ -47,6 +47,7 @@ export default function Traslados() {
     tipo: 'materiales', origen: 'Taller', destino: 'Local Mercedes',
     responsable: '', id_trabajo: '', notas: '',
     fecha: new Date().toLocaleDateString('en-CA', { timeZone: 'America/Santo_Domingo' }),
+    descuenta_stock: false,
   });
   const [items, setItems] = useState<any[]>([{ ...emptyItem }]);
 
@@ -107,28 +108,38 @@ export default function Traslados() {
           cantidad:     Number(item.cantidad),
           unidad:       item.unidad,
         });
-        // Si es material del inventario, registrar salida
-        if (item.id_item && form.tipo === 'materiales') {
-          const inv = inventario.find((i: any) => i.id === item.id_item);
-          if (inv) {
-            await db.from('inventario').update({
-              stock_actual: Math.max(0, (inv.stock_actual || 0) - Number(item.cantidad))
-            }).eq('id', item.id_item);
+        // Solo descuenta si el usuario marcó que se consumió (no solo se movió)
+        if (item.id_item && form.tipo === 'materiales' && form.descuenta_stock) {
+          const { data: invFresh } = await db.from('inventario').select('stock_actual, unidad').eq('id', item.id_item).single();
+          if (invFresh) {
+            const stockAntes = invFresh.stock_actual || 0;
+            const stockDespues = Math.max(0, stockAntes - Number(item.cantidad));
+            await db.from('inventario').update({ stock_actual: stockDespues }).eq('id', item.id_item);
             await db.from('inventario_movimientos').insert({
-              id_item: item.id_item,
+              id_item:         item.id_item,
               tipo_movimiento: 'Salida',
-              cantidad: Number(item.cantidad),
-              motivo: `Traslado ${form.origen} → ${form.destino}`,
-              fecha: form.fecha,
+              cantidad:        Number(item.cantidad),
+              motivo:          `Traslado ${form.origen} → ${form.destino}`,
+              fecha:           form.fecha,
+              stock_antes:     stockAntes,
+              stock_despues:   stockDespues,
             });
           }
         }
       }
 
+      // Si es pieza y tiene trabajo vinculado, actualizar local del trabajo
+      if (form.tipo === 'pieza' && form.id_trabajo) {
+        await db.from('trabajos').update({ local_trabajo: form.destino }).eq('id', form.id_trabajo);
+      }
+
       reload(); setDialogOpen(false);
-      setForm({ tipo: 'materiales', origen: 'Taller', destino: 'Local Mercedes', responsable: '', id_trabajo: '', notas: '', fecha: new Date().toLocaleDateString('en-CA', { timeZone: 'America/Santo_Domingo' }) });
+      setForm({ tipo: 'materiales', origen: 'Taller', destino: 'Local Mercedes', responsable: '', id_trabajo: '', notas: '', fecha: new Date().toLocaleDateString('en-CA', { timeZone: 'America/Santo_Domingo' }), descuenta_stock: false });
       setItems([{ ...emptyItem }]);
-      toast({ title: '✅ Traslado registrado' });
+      const msg = form.tipo === 'pieza'
+        ? '✅ Pieza movida — ubicación actualizada en el trabajo'
+        : '✅ Traslado de materiales registrado';
+      toast({ title: msg });
     } catch (e: any) {
       toast({ title: 'Error guardando', description: e?.message, variant: 'destructive' });
     } finally { setSaving(false); }
@@ -284,7 +295,31 @@ export default function Traslados() {
               </button>
             </div>
 
-            {/* Origen → Destino */}
+            {/* Toggle solo para materiales */}
+            {form.tipo === 'materiales' && (
+              <div className="space-y-2">
+                <p className="text-xs font-semibold text-muted-foreground">Que paso con estos materiales?</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <button type="button" onClick={() => setForm({...form, descuenta_stock: false})}
+                    className={`p-3 rounded-lg border text-xs font-medium transition-colors text-left ${!form.descuenta_stock ? 'border-blue-400 bg-blue-50 dark:bg-blue-950/20 text-blue-700' : 'border-border hover:bg-secondary'}`}>
+                    Movido entre almacenes
+                    <p className="font-normal mt-0.5 text-muted-foreground">No descuenta del stock</p>
+                  </button>
+                  <button type="button" onClick={() => setForm({...form, descuenta_stock: true})}
+                    className={`p-3 rounded-lg border text-xs font-medium transition-colors text-left ${form.descuenta_stock ? 'border-amber-400 bg-amber-50 dark:bg-amber-950/20 text-amber-700' : 'border-border hover:bg-secondary'}`}>
+                    Consumido / Entregado
+                    <p className="font-normal mt-0.5 text-muted-foreground">Descuenta del stock</p>
+                  </button>
+                </div>
+              </div>
+            )}
+            {form.tipo === 'pieza' && (
+              <div className="p-3 rounded-lg bg-blue-50 dark:bg-blue-950/20 border border-blue-200 text-sm text-blue-700">
+                Solo cambia la ubicacion del trabajo, no toca el stock.
+              </div>
+            )}
+
+            {/* Origen a Destino */}
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-1.5">
                 <Label className="text-xs">Origen *</Label>
