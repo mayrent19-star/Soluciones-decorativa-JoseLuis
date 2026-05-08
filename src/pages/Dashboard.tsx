@@ -11,7 +11,7 @@ import StockAlerts from '@/components/StockAlerts';
 const db = supabase as any;
 
 export default function Dashboard() {
-  const hoy = new Date().toISOString().slice(0, 10);
+  const hoy = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Santo_Domingo' });
   const { isOwner } = useAuth();
   const [trabajos, setTrabajos] = useState<any[]>([]);
   const [allCaja, setAllCaja] = useState<any[]>([]);

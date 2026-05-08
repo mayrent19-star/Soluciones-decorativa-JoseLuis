@@ -70,7 +70,7 @@ const estadoColor: Record<string, string> = {
 
 const empty = {
   id_cliente: '', descripcion_trabajo: '', categoria: 'Tapicería',
-  estado: 'Sin iniciar', fecha_inicio: new Date().toISOString().slice(0, 10),
+  estado: 'Sin iniciar', fecha_inicio: new Date().toLocaleDateString('en-CA', { timeZone: 'America/Santo_Domingo' }),
   monto_final: null as number | null, abono: null as number | null,
   tipo_trabajo: 'Reparación' as (typeof tipos)[number],
   fotos_antes: [] as string[], fotos_despues: [] as string[],
@@ -621,14 +621,14 @@ export default function Trabajos() {
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <Button variant="outline" onClick={async () => {
               if (facturaModal) {
-                await updateRow('trabajos', facturaModal.id, { estado: 'Finalizado', fecha_finalizado: new Date().toISOString().slice(0, 10) });
+                await updateRow('trabajos', facturaModal.id, { estado: 'Finalizado', fecha_finalizado: new Date().toLocaleDateString('en-CA', { timeZone: 'America/Santo_Domingo' }) });
                 reload(); setFacturaModal(null);
                 toast({ title: '✅ Trabajo finalizado' });
               }
             }}>No, solo finalizar</Button>
             <AlertDialogAction onClick={async () => {
               if (facturaModal) {
-                await updateRow('trabajos', facturaModal.id, { estado: 'Finalizado', fecha_finalizado: new Date().toISOString().slice(0, 10) });
+                await updateRow('trabajos', facturaModal.id, { estado: 'Finalizado', fecha_finalizado: new Date().toLocaleDateString('en-CA', { timeZone: 'America/Santo_Domingo' }) });
                 reload(); setFacturaModal(null);
                 toast({ title: '✅ Trabajo finalizado' });
                 window.open(`/trabajos/${facturaModal.id}`, '_blank');

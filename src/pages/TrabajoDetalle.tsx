@@ -65,7 +65,7 @@ export default function TrabajoDetalle() {
   const [moverCasaForm, setMoverCasaForm] = useState<any>({ nombre: '', descripcion: '', tipo: 'Estructura', estado: 'Sin terminar', ubicacion: 'Local Mercedes' });
   const [pagoForm, setPagoForm] = useState<any>({
     monto: '', metodo: 'Efectivo',
-    fecha: new Date().toISOString().slice(0, 10), notas: ''
+    fecha: new Date().toLocaleDateString('en-CA', { timeZone: 'America/Santo_Domingo' }), notas: ''
   });
 
   const reload = async () => {
@@ -106,13 +106,13 @@ export default function TrabajoDetalle() {
 
   const marcarFinalizado = async () => {
     if (pendiente > 0) { setFinalizarModal({ estado: 'Finalizado' }); return; }
-    await updateRow('trabajos', trabajo.id, { estado: 'Finalizado', fecha_finalizado: new Date().toISOString().slice(0, 10) });
+    await updateRow('trabajos', trabajo.id, { estado: 'Finalizado', fecha_finalizado: new Date().toLocaleDateString('en-CA', { timeZone: 'America/Santo_Domingo' }) });
     reload(); toast({ title: 'Trabajo finalizado' });
   };
 
   const confirmarFinalizar = async (conDeuda: boolean) => {
     const updates: any = { estado: finalizarModal!.estado };
-    if (finalizarModal!.estado === 'Finalizado') updates.fecha_finalizado = new Date().toISOString().slice(0, 10);
+    if (finalizarModal!.estado === 'Finalizado') updates.fecha_finalizado = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Santo_Domingo' });
     await updateRow('trabajos', trabajo.id, updates);
     setFinalizarModal(null);
     reload();
@@ -211,7 +211,7 @@ export default function TrabajoDetalle() {
     });
     reload();
     setPagoDialog(false);
-    setPagoForm({ monto: '', metodo: 'Efectivo', fecha: new Date().toISOString().slice(0, 10), notas: '' });
+    setPagoForm({ monto: '', metodo: 'Efectivo', fecha: new Date().toLocaleDateString('en-CA', { timeZone: 'America/Santo_Domingo' }), notas: '' });
     toast({ title: '✅ Pago registrado' });
   };
 

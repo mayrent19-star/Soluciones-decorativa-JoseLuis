@@ -17,7 +17,7 @@ import { formatCurrency, formatDate } from '@/utils/helpers';
 import { registrarAuditoria } from '@/hooks/useAuditoria';
 
 const db = supabase as any;
-const hoyStr = new Date().toISOString().slice(0, 10);
+const hoyStr = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Santo_Domingo' });
 const emptyMov = { tipo: 'Entrada', fecha: hoyStr, monto: 0, detalle: '', categoria_gasto: '', metodo_pago: 'Efectivo', cuenta_detalle: '', id_trabajo: null, id_empleado: null };
 
 export default function CajaChica() {
