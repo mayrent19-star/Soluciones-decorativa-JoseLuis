@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'v3';
+const CACHE_VERSION = 'v4';
 const STATIC_CACHE  = `soluciones-jl-static-${CACHE_VERSION}`;
 const RUNTIME_CACHE = `soluciones-jl-runtime-${CACHE_VERSION}`;
 const APP_SHELL     = ['/', '/index.html', '/manifest.webmanifest'];
@@ -44,20 +44,25 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Navegación (rutas React) — red primero, fallback a index.html
+  // Navegación — red primero, fallback a index.html en cache
+  // NUNCA cachear errores de red
   if (isNavigation(event.request)) {
     event.respondWith(
-      fetch(event.request)
+      fetch(event.request, { cache: 'no-store' })
         .then((res) => {
-          const copy = res.clone();
-          caches.open(RUNTIME_CACHE).then((c) => c.put(event.request, copy));
+          // Solo cachear respuestas exitosas
+          if (res.ok) {
+            const copy = res.clone();
+            caches.open(RUNTIME_CACHE).then((c) => c.put(event.request, copy));
+          }
           return res;
         })
         .catch(async () => {
-          const cached = await caches.match(event.request);
+          // Sin red — buscar en cache
+          const cached = await caches.match('/index.html', { cacheName: STATIC_CACHE });
           if (cached) return cached;
-          const shell = await caches.match('/index.html');
-          return shell || Response.error();
+          const runtimeCached = await caches.match(event.request);
+          return runtimeCached || Response.error();
         })
     );
     return;
@@ -69,6 +74,7 @@ self.addEventListener('fetch', (event) => {
       caches.match(event.request).then((cached) => {
         if (cached) return cached;
         return fetch(event.request).then((res) => {
+          // Solo cachear si la respuesta es exitosa
           if (res.ok) {
             const copy = res.clone();
             caches.open(RUNTIME_CACHE).then((c) => c.put(event.request, copy));
@@ -82,7 +88,9 @@ self.addEventListener('fetch', (event) => {
 
   // Todo lo demás — red con fallback a cache
   event.respondWith(
-    fetch(event.request).catch(() => caches.match(event.request).then((c) => c || Response.error()))
+    fetch(event.request)
+      .catch(() => caches.match(event.request)
+        .then((c) => c || Response.error()))
   );
 });
 
